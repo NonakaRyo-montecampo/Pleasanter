@@ -1,11 +1,12 @@
-// 交通費申請　編集画面
+// 交通費申請レコード　編集画面
 $p.events.on_editor_load = function () {
+    
     //#region<定数定義>
     //=====================================================================================================================================================
     const gasUrl = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec'; // ★あなたのGASのURL
     const CLASS_DEP = 'ClassA'; //「出発駅」欄
     const CLASS_ARR = 'ClassB'; //「到着駅」欄
-    const CLASS_PURPOSE = 'ClassD'; //「行先」欄
+    const CLASS_TRAFFWAY = 'ClassD'; //「交通手段」欄
     const CLASS_APPLICANT = 'ClassE'; //「利用者」欄
     const CLASS_SUPERIOR = 'ClassC'; //「上長」欄    
     const CLASS_PARENTID = 'ClassI'; //「精算書名」欄
@@ -226,10 +227,10 @@ $p.events.on_editor_load = function () {
         const newRecord = {
             Title: $p.getControl('Title').val(), // 行先
             DateA: $p.getControl('StartTime').val(), // 利用日
-            ClassA: $p.getControl('ClassA').val(),   // 出発
-            ClassB: $p.getControl('ClassB').val(),   // 到着
-            ClassC: $p.getControl('ClassD').val(),   // 交通手段(履歴側はClassCと仮定)
-            NumA:   parseInt($p.getControl('NumA').val().replace(/,/g, '')), // 金額
+            ClassA: $p.getControl(CLASS_DEP).val(),   // 出発
+            ClassB: $p.getControl(CLASS_ARR).val(),   // 到着
+            ClassC: $p.getControl(CLASS_TRAFFWAY).val(),   // 交通手段(履歴側はClassCと仮定)
+            NumA:   parseInt($p.getControl(CLASS_COST_ONEWAY).val().replace(/,/g, '')), // 金額
             ClassD: $p.userId(),                      // 登録ユーザー
             Body: $p.getControl('Body').val(),   // 備考
         };
@@ -257,7 +258,7 @@ $p.events.on_editor_load = function () {
                    r.ClassC === newRecord.ClassC && // 手段
                    r.NumA   === newRecord.NumA;
         });
-
+        
         if (isDuplicate) {
             console.log("DEBUG: History duplicate. Skip.");
             return;
@@ -309,7 +310,6 @@ $p.events.on_editor_load = function () {
                 console.error(e);
                 return;
             }
-
 
             // 4. セッション配列の先頭に追加
             //historyList.unshift(createdRecord);
@@ -788,7 +788,7 @@ $p.events.on_editor_load = function () {
                 // ★ブラケット記法 [] を使うことで、定数の値をキーとして展開できます
                 [FAV_FIELDS.DEP]:  $p.getControl(CLASS_DEP).val(), // 出発
                 [FAV_FIELDS.ARR]:  $p.getControl(CLASS_ARR).val(), // 到着
-                [FAV_FIELDS.WAY]:  $p.getControl(CLASS_PURPOSE).val(),  // 交通手段 (子はClassD)
+                [FAV_FIELDS.WAY]:  $p.getControl(CLASS_TRAFFWAY).val(),  // 交通手段 (子はClassD)
                 [FAV_FIELDS.USER]: $p.userId()                     // 登録ユーザー
             },
             NumHash: {

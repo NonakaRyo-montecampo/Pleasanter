@@ -1,3 +1,4 @@
+// 交通費申請　編集画面
 $p.events.on_editor_load = function () {
 
     //#region<定数定義>
@@ -522,7 +523,7 @@ $p.events.on_editor_load = function () {
                 $histContainer.html('<p style="color:#666; margin:10px;">履歴はありません。</p>');
             } else {
                 let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;">';
-                tableHtml += '<thead style="background:#eee;"><tr><th style="width:50px; padding:5px;"></th><th style="padding:5px;">日付</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th></tr></thead><tbody>';
+                tableHtml += '<thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="padding:5px;">日付</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th></tr></thead><tbody>';
                 
                 const limit = (typeof PAGE_SIZE !== 'undefined') ? PAGE_SIZE : 5;
                 historyList.slice(0, limit).forEach(r => {
@@ -542,7 +543,7 @@ $p.events.on_editor_load = function () {
                     tableHtml += `
                         <tr style="border-bottom:1px solid #eee;">
                             <td style="text-align:center; padding: 5px;">
-                                <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px;" data-json="${jsonStr}">選択</button>
+                                <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px; white-space: nowrap;" data-json="${jsonStr}">選択</button>
                             </td>
                             <td style="padding: 5px;">${dateStr}</td>
                             <td style="padding: 5px;">${routeDesc}</td>
@@ -576,7 +577,7 @@ $p.events.on_editor_load = function () {
             const displayRecords = cachedFavRecords.slice(startIndex, endIndex);
 
             let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;">';
-            tableHtml += '<thead style="background:#eee;"><tr><th style="width:50px; padding:5px;"></th><th style="padding:5px;">名称</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="width:30px; padding:5px;"></th></tr></thead><tbody>';
+            tableHtml += '<thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="padding:5px;">名称</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="width:30px; padding:5px;"></th></tr></thead><tbody>';
             
             displayRecords.forEach(r => {
                 const recordId = r.IssueId || r.ResultId || r.Id;
@@ -596,7 +597,7 @@ $p.events.on_editor_load = function () {
                 tableHtml += `
                     <tr style="border-bottom:1px solid #eee;">
                         <td style="text-align:center; padding: 5px;">
-                            <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px;" data-json="${jsonStr}">選択</button>
+                            <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px; white-space: nowrap;" data-json="${jsonStr}">選択</button>
                         </td>
                         <td style="padding: 5px;">${r.Title}</td>
                         <td style="padding: 5px;">${routeDesc}</td>
@@ -755,7 +756,7 @@ $p.events.on_editor_load = function () {
         // 経路ボタン($targetBtn)の後ろに追加。ファイル選択inputは非表示で配置。
         const ocrBtnHtml = `
             <button id="BtnOcrRead" class="button button-icon ui-button ui-corner-all ui-widget" style="margin-left: 10px;">
-                <span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-image"></span>画像から読取
+                <span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-image"></span>画像から交通費情報を読取(OCR)
             </button>
             <input type="file" id="OcrFileInput" accept="image/png, image/jpeg" style="display:none;">
         `;
