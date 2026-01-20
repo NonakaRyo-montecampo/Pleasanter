@@ -188,19 +188,12 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region<上長以外、承認待ち時に承認ボタン非活性>
-
+    
 
     //#endregion
 
-    //#region<交通費精算レコード操作>
-    
-    
-    //#endregion
+    //#region<既存ボタンのリネーム・装飾・制御>
 
-    //#region<画面制御：読み取り専用化>
-
-    //<既存ボタンのリネーム・装飾・制御>
-    //子レコード作成ボタン
     // 子レコード作成ボタン（青いボタン）を特定
     var $targetBtn = $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]');
     
@@ -287,20 +280,24 @@ $p.events.on_editor_load = function () {
     }
     //#endregion
 
-    //#region<子レコード並び替え機能（軽量版）>
+    //#region<子レコード並び替え機能（順次更新版）> ※現段階では実装中止
+    /*
     // =========================================================================
     // ▼ 子レコード（交通費申請レコード）のドラッグ&ドロップ並び替え
-    //   ・アラートなし、リロードなし、上から1,2,3...と連番を振る
+    //   ・429エラー対策：1件ずつ順番に更新するロジックに変更
     // =========================================================================
     
     // 定数定義
-    //const CHILD_TABLE_ID = 15339887; // 子テーブルID
+    const CHILD_TABLE_ID_SORT = 15339887; // 子テーブルID
     const SORT_COL_NAME = 'NumB';         // 連番を格納する項目名（精算書内データNo）
+
+    // ▼ 待機用関数 (ミリ秒)
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     // ▼ ソート機能を適用する関数
     const initSortableTable = () => {
         // セレクタ：data-id属性でテーブルを特定
-        const $table = $('table[data-id="' + CHILD_TABLE_ID + '"]');
+        const $table = $('table[data-id="' + CHILD_TABLE_ID_SORT + '"]');
         
         if ($table.length === 0) {
             return false; // まだ描画されていない
@@ -326,45 +323,50 @@ $p.events.on_editor_load = function () {
                 return $helper;
             },
             update: async function(event, ui) {
-                // ドロップ時の処理（確認アラートなしで即実行）
+                // ドロップ時の処理
                 
-                // 1. 保存中であることを示すため少し薄くする（操作ブロック）
+                // 1. 保存中であることを示すため少し薄くする
                 $table.css('opacity', '0.5').css('pointer-events', 'none');
-                console.log("DEBUG: Saving new order...");
+                console.log("DEBUG: Saving new order (Sequentially)...");
 
                 try {
-                    // 2. 画面上の並び順通りにIDを取得して更新リスト作成
-                    let updatePromises = [];
-                    
+                    // 2. 画面上の並び順通りに更新用データをリストアップ
+                    let updateTasks = [];
                     $tbody.find('tr').each(function(index) {
-                        const rowId = $(this).data('id'); // 行ID (RecordId)
-                        const newNum = index + 1;         // 上から 1, 2, 3... と振る（昇順）
+                        const rowId = $(this).data('id'); // 行ID
+                        const newNum = index + 1;         // 上から 1, 2, 3...
                         
                         if (rowId) {
-                            // API更新予約（NumBのみ更新）
-                            const promise = $p.apiUpdate({
-                                id: rowId,
-                                data: {
-                                    NumHash: {
-                                        [SORT_COL_NAME]: newNum
-                                    }
-                                }
-                            });
-                            updatePromises.push(promise);
+                            updateTasks.push({ id: rowId, num: newNum });
                         }
                     });
 
-                    // 3. 一括更新実行（裏側で処理）
-                    await Promise.all(updatePromises);
+                    // 3. 【重要】1件ずつ順番に更新実行 (429エラー回避)
+                    for (const task of updateTasks) {
+                        await $p.apiUpdate({
+                            id: task.id,
+                            data: {
+                                NumHash: {
+                                    [SORT_COL_NAME]: task.num
+                                }
+                            }
+                        });
+                        // サーバー負荷軽減のため、わずかに待機 (100ms)
+                        await sleep(100);
+                    }
                     
                     console.log("DEBUG: Order saved successfully.");
 
                 } catch (e) {
                     console.error("Sort update failed:", e);
-                    // 失敗した時だけアラートを出す（気づかないと困るため）
-                    alert("並び替えの保存に失敗しました。通信環境を確認してください。");
+                    // エラーオブジェクトの中身を確認
+                    if (e.status === 429) {
+                        alert("通信が混み合っており保存できませんでした。少し時間を置いて再試行してください。");
+                    } else {
+                        alert("並び替えの保存に失敗しました。");
+                    }
                 } finally {
-                    // 4. 保存完了後、見た目を元に戻す（リロードはしない）
+                    // 4. 保存完了後、見た目を元に戻す
                     $table.css('opacity', '1').css('pointer-events', 'auto');
                 }
             }
@@ -385,7 +387,7 @@ $p.events.on_editor_load = function () {
         }
         sortInitRetryCount++;
     }, 500);
-
+    */
     //#endregion
 
     //#region<精算書PDF出力>
@@ -652,7 +654,7 @@ $p.events.on_editor_load = function () {
                             </td>
                             <td style="padding: 5px;">${dateStr}</td>
                             <td style="padding: 5px;">${routeDesc}</td>
-                            <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()}</td>
+                            <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString() + "円"}</td>
                             <td style="padding: 5px;">${memoStr}</td> <!--add-->
                         </tr>
                     `;
@@ -712,7 +714,7 @@ $p.events.on_editor_load = function () {
                         </td>
                         <td style="padding: 5px;">${r.Title}</td>
                         <td style="padding: 5px;">${routeDesc}</td>
-                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()}</td>
+                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()  + "円"}</td>
                         <td style="text-align:center; padding: 5px;">
                             <button type="button" class="delete-fav-btn ui-button ui-corner-all ui-widget" 
                                     style="padding: 1px 6px; font-size: 11px; color: white; background-color: #d9534f; border: 1px solid #d43f3a; border-radius: 3px;"
