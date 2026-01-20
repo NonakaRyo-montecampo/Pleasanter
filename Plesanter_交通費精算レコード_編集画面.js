@@ -399,7 +399,7 @@ $p.events.on_editor_load = function () {
                    r.ClassC === newRecord.ClassC &&
                    r.NumA   === newRecord.NumA;
         });
-        
+
         // --- 4. 重複データの削除（サーバー & 配列） ---
         if (duplicateIndex !== -1) {
             console.log("DEBUG: Duplicate found at index " + duplicateIndex + ". Removing old record...");
@@ -683,7 +683,31 @@ $p.events.on_editor_load = function () {
     // =========================================================================
     
     $('#CreateCommand').hide();
+    // ---------------------------------------------------------
+    // 「保存せずに戻る」ボタンのカスタマイズ
+    // ---------------------------------------------------------
+    // 1. テキスト変更
     $('#GoBack').contents().filter(function() { return this.nodeType === 3; }).replaceWith('保存せずに戻る');
+
+    // 2. クリック動作の上書き (標準動作を無効化して親画面へ遷移)
+    // ※プリザンターの標準イベントを外して、独自の遷移処理を入れる
+    $('#GoBack').off('click').on('click', function(e) {
+        e.preventDefault(); // 標準動作（一覧へ戻る）をキャンセル
+
+        // 親IDを取得
+        const parentId = getParentId();
+
+        // 遷移先URLの決定
+        // 親IDがあれば親レコード編集画面へ、なければサイトトップ（一覧）へ
+        const targetUrl = parentId ? '/fs/Items/' + parentId : '/fs/Items/' + $p.siteId();
+
+        // セッションゴミ掃除（念のため）
+        sessionStorage.removeItem('TrafficApp_CopyData');
+        sessionStorage.removeItem('TrafficApp_OcrQueue');
+
+        // 画面遷移
+        window.location.href = targetUrl;
+    });
 
     // --- OCRキューの確認 ---
     const ocrQueueJson = sessionStorage.getItem('TrafficApp_OcrQueue');

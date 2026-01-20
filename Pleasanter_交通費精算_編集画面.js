@@ -412,9 +412,6 @@ $p.events.on_editor_load = function () {
     // ▼ 経路選択パネル（履歴対応・キャッシュ版・順序修正済み）
     // =========================================================================
 
-    // ★定数は上部の<定数定義>リージョンのものを使用します。
-    // (FAV_TABLE_ID, HIST_TABLE_ID, CHILD_TABLE_ID, FAV_USER_COL, HIST_USER_COL, PAGE_SIZE は定義済み前提)
-
     // データを保持しておくための変数（キャッシュ）
     let cachedFavRecords = null;
 
@@ -531,7 +528,10 @@ $p.events.on_editor_load = function () {
                                       ' <span style="color:#666;">(' + (r.ClassC || '-') + ')</span>'; 
                     
                     const copyData = {
-                        ClassA: r.ClassA, ClassB: r.ClassB, ClassD: r.ClassC, NumA: r.NumA, 
+                        ClassA: r.ClassA, 
+                        ClassB: r.ClassB, 
+                        ClassD: r.ClassC, 
+                        NumC: r.NumA, 
                         ClassE: $p.getControl('ClassA').val(), 
                         ClassC: $p.getControl('ClassB').val(), 
                         ClassI: String($p.id()),               
@@ -549,7 +549,7 @@ $p.events.on_editor_load = function () {
                             </td>
                             <td style="padding: 5px;">${dateStr}</td>
                             <td style="padding: 5px;">${routeDesc}</td>
-                            <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString() + "円"}</td>
+                            <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()}</td>
                             <td style="padding: 5px;">${memoStr}</td> <!--add-->
                         </tr>
                     `;
@@ -589,7 +589,12 @@ $p.events.on_editor_load = function () {
                 
                 const copyData = {
                     Title: r.Title,
-                    ClassA: r.ClassA, ClassB: r.ClassB, ClassD: r.ClassC, NumA: r.NumA, Body: r.Body,
+                    ClassA: r.ClassA, 
+                    ClassB: r.ClassB, 
+                    ClassD: r.ClassC, 
+                    NumC: r.NumA, 
+                    Body: r.Body,
+                    
                     ClassE: $p.getControl('ClassA').val(), 
                     ClassC: $p.getControl('ClassB').val(), 
                     ClassI: String($p.id()),               
@@ -604,7 +609,7 @@ $p.events.on_editor_load = function () {
                         </td>
                         <td style="padding: 5px;">${r.Title}</td>
                         <td style="padding: 5px;">${routeDesc}</td>
-                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString() + "円"}</td>
+                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()}</td>
                         <td style="text-align:center; padding: 5px;">
                             <button type="button" class="delete-fav-btn ui-button ui-corner-all ui-widget" 
                                     style="padding: 1px 6px; font-size: 11px; color: white; background-color: #d9534f; border: 1px solid #d43f3a; border-radius: 3px;"
