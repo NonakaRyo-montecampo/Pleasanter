@@ -46,6 +46,7 @@ $p.events.on_editor_load = function () {
     //「経路履歴」テーブル
     const HIST_TABLE_ID = 15960204;
     const HIST_USER_COL = 'ClassD'; // お気に入りマスタのユーザーID項目
+    const HIST_REGISTQTY = 5; //経路履歴最大保存件数
 
     //経路候補一覧関連
     const PAGE_SIZE = 5;            // 1ページに表示する件数
@@ -285,7 +286,7 @@ $p.events.on_editor_load = function () {
         }
     }
     //#endregion
-    
+
     //#region<精算書PDF出力>
     // =========================================================================
     // ▼ PDF出力ボタンの追加と処理
@@ -426,7 +427,7 @@ $p.events.on_editor_load = function () {
         const panelHtml = `
             <div id="CustomRouteContainer" style="clear: both; margin-top: 20px;">
                 <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; color: #333; cursor: pointer; user-select: none;">
-                    <span id="RoutePanelToggleIcon" class="ui-icon ui-icon-triangle-1-s" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>経路候補一覧
+                    <span id="RoutePanelToggleIcon" class="ui-icon ui-icon-circle-minus" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>経路候補一覧
                 </h4>
                 <div id="EmbeddedRoutePanel" style="border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; border-radius: 4px;">
                     <div id="RouteTabs" style="font-size: 0.9em; background: transparent; border: none;">
@@ -519,7 +520,8 @@ $p.events.on_editor_load = function () {
             if (historyList.length === 0) {
                 $histContainer.html('<p style="color:#666; margin:10px;">履歴はありません。</p>');
             } else {
-                let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;">';
+                let tableHtml = '<p style="color:#666; margin:10px;">直近' + HIST_REGISTQTY + '件の登録経路情報が表示されます。</p>';
+                tableHtml += '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;">';
                 tableHtml += '<thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="width:200px; "padding:5px;">日付</th><th style="width:200px; "padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="padding:5px;">備考</th></tr></thead><tbody>';
                 
                 const limit = (typeof PAGE_SIZE !== 'undefined') ? PAGE_SIZE : 5;
@@ -700,9 +702,11 @@ $p.events.on_editor_load = function () {
             var $icon = $('#RoutePanelToggleIcon');
             $panel.slideToggle(200, function() {
                 if ($panel.is(':visible')) {
-                    $icon.removeClass('ui-icon-triangle-1-e').addClass('ui-icon-triangle-1-s');
+                    //$icon.removeClass('ui-icon-triangle-1-e').addClass('ui-icon-triangle-1-s');
+                    $icon.removeClass('ui-icon-circle-plus').addClass('ui-icon-circle-minus');
                 } else {
-                    $icon.removeClass('ui-icon-triangle-1-s').addClass('ui-icon-triangle-1-e');
+                    //$icon.removeClass('ui-icon-triangle-1-s').addClass('ui-icon-triangle-1-e');
+                    $icon.removeClass('ui-icon-circle-minus').addClass('ui-icon-circle-plus');
                 }
             });
         });

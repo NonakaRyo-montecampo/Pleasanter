@@ -59,6 +59,7 @@ $p.events.on_editor_load = function () {
     const HIST_TABLE_ID = 15960204; // ★【要修正】履歴テーブルID
     const SESSION_KEY_HIST = 'TrafficApp_History';
     const HIST_USER_COL = 'ClassD'; // お気に入りマスタのユーザーID項目
+    const HIST_REGISTQTY = 5; //経路履歴最大保存件数
     //-------------------------------------------------------------------------------------
 
     // 読み取り専用化
@@ -455,8 +456,7 @@ $p.events.on_editor_load = function () {
             historyList.unshift(createdRecord);
 
             // --- 7. 件数制限（最大5件）オーバーの削除 ---
-            const MAX_HISTORY = 5;
-            if (historyList.length > MAX_HISTORY) {
+            if (historyList.length > HIST_REGISTQTY) {
                 const itemToDelete = historyList.pop(); // 末尾（一番古い）を取り出す
                 const deleteId = itemToDelete.IssueId || itemToDelete.ResultId || itemToDelete.Id;
                 
