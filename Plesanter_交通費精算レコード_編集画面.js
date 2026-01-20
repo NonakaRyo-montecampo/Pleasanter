@@ -112,8 +112,6 @@ $p.events.on_editor_load = function () {
             });
         });
     };
-    
-
     // ▼ API送信用データ作成関数
     const buildApiPayload = (fieldsConfig, linkColumn, linkValue) => {
         var data = {
@@ -181,7 +179,6 @@ $p.events.on_editor_load = function () {
 
         return data;
     };
-
     // ▼ 必須入力チェック関数
     const validateRequiredFields = () => {
         let errorFields = [];
@@ -210,7 +207,6 @@ $p.events.on_editor_load = function () {
         }
         return true;
     };
-
     // ▼ 親IDをDOMまたはURLから確実に取得する関数
     const getParentId = () => {
         let val = $p.getControl(COL_LINK_TRANSREPO).val();
@@ -220,8 +216,8 @@ $p.events.on_editor_load = function () {
         const params = new URLSearchParams(window.location.search);
         return params.get('LinkId');
     };
-
     // ▼ 履歴登録処理関数（子画面用）
+    /*
     const addToHistoryAsync = async () => {
         // 保存しようとしているデータ
         const newRecord = {
@@ -248,6 +244,21 @@ $p.events.on_editor_load = function () {
         const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
         if (sessionData) {
             historyList = JSON.parse(sessionData).data || [];
+        }
+        
+        // --- 2. セッションから現在の履歴リストを取得 ---
+        let historyList = [];
+        const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
+        if (sessionData) {
+            try {
+                const parsed = JSON.parse(sessionData);
+                // ユーザーIDが一致する場合のみ採用（別ユーザーでのログイン対策）
+                if (String(parsed.userId) === String($p.userId())) {
+                    historyList = parsed.data || [];
+                }
+            } catch (e) {
+                historyList = [];
+            }
         }
 
         // 2. 重複チェック（行先・手段・出発・到着・金額）
@@ -317,7 +328,7 @@ $p.events.on_editor_load = function () {
             // 5. 5件を超えていたら、一番古いものをAPIで削除 ＆ 配列から削除
             if (historyList.length > 5) {
                 const itemToDelete = historyList.pop(); // 末尾（一番古い）を取得
-                const deleteId = /*itemToDelete.IssueId || */itemToDelete.ResultId/* || itemToDelete.Id*/;
+                const deleteId = itemToDelete.ResultId;
                 console.log("DEBUG: delete record ID: " + deleteId);
                 if (deleteId) {
                     // 削除API実行（awaitしなくてもよいが、安全のため）
@@ -340,7 +351,134 @@ $p.events.on_editor_load = function () {
             alert("ERROR: 登録履歴の処理中にエラーが発生しました。: addToHistoryAsync()");
         }
     };
+    */
     
+    // ▼ 履歴登録処理関数（重複入替・最新先頭維持版）
+    const addToHistoryAsync = async () => {
+        // --- 1. 保存データの構築 ---
+        const rawNum = $p.getControl(CLASS_COST_ONEWAY).val();
+        const costVal = rawNum ? parseFloat(rawNum.replace(/,/g, '')) : 0;
+
+        const newRecord = {
+            Title:  $p.getControl('Title').val(),      // 行先
+            DateA:  $p.getControl('StartTime').val(),  // 利用日
+            ClassA: $p.getControl(CLASS_DEP).val(),    // 出発
+            ClassB: $p.getControl(CLASS_ARR).val(),    // 到着
+            ClassC: $p.getControl(CLASS_TRAFFWAY).val(), // 交通手段
+            NumA:   costVal,                           // 金額
+            ClassD: String($p.userId()),               // 登録ユーザー
+            Body:   $p.getControl('Body').val(),       // 備考
+        };
+
+        // 必須項目（出発・到着）が空なら履歴保存しない
+        if (!newRecord.ClassA || !newRecord.ClassB) {
+            console.log("DEBUG: History skip (Required fields empty).");
+            return;
+        }
+
+        // --- 2. セッションから現在の履歴リストを取得 ---
+        let historyList = [];
+        const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
+        if (sessionData) {
+            try {
+                const parsed = JSON.parse(sessionData);
+                // ユーザーIDが一致する場合のみ採用（別ユーザーでのログイン対策）
+                if (String(parsed.userId) === String($p.userId())) {
+                    historyList = parsed.data || [];
+                }
+            } catch (e) {
+                historyList = [];
+            }
+        }
+
+        // --- 3. 重複チェック（出発・到着・手段・金額） ---
+        // ※完全に一致するデータが既にあるか探す
+        const duplicateIndex = historyList.findIndex(r => {
+            return r.ClassA === newRecord.ClassA &&
+                   r.ClassB === newRecord.ClassB &&
+                   r.ClassC === newRecord.ClassC &&
+                   r.NumA   === newRecord.NumA;
+        });
+        
+        // --- 4. 重複データの削除（サーバー & 配列） ---
+        if (duplicateIndex !== -1) {
+            console.log("DEBUG: Duplicate found at index " + duplicateIndex + ". Removing old record...");
+            
+            const oldRecord = historyList[duplicateIndex];
+            const deleteId = oldRecord.IssueId || oldRecord.ResultId || oldRecord.Id;
+
+            // サーバーから削除（非同期・待機しない）
+            if (deleteId) {
+                apiDeleteAsync(deleteId).catch(e => console.error("Old history delete failed", e));
+            }
+            // 配列から削除
+            historyList.splice(duplicateIndex, 1);
+        }
+
+        // --- 5. 新規レコードをサーバーに登録 ---
+        try {
+            // $p.apiCreate 用データ（フラット構造）
+            const apiData = {
+                Title:  newRecord.Title,
+                DateA:  newRecord.DateA,
+                ClassA: newRecord.ClassA,
+                ClassB: newRecord.ClassB,
+                ClassC: newRecord.ClassC,
+                ClassD: newRecord.ClassD,
+                NumA:   newRecord.NumA,
+                Body:   newRecord.Body
+            };
+
+            const res = await apiCreateAsync({
+                id: HIST_TABLE_ID,
+                data: apiData
+            });
+
+            // ID取得（レスポンス形式に合わせて調整）
+            const createdId = res.Id || (res.Response && res.Response.Data && res.Response.Data.Id);
+            
+            if (!createdId) {
+                console.warn("DEBUG: Created ID not found in response.", res);
+                // IDが取れなくても、画面上の履歴リスト更新のために擬似IDで続行させる手もあるが、
+                // 次回の削除ができないのでここではエラーとするか、APIの仕様に合わせて調整してください。
+            }
+
+            // --- 6. 履歴リストの先頭に追加 ---
+            // 次回の削除用にIDを含めたオブジェクトを作成
+            const createdRecord = {
+                Id: createdId,
+                IssueId: createdId,
+                ResultId: createdId,
+                ...newRecord // 入力データを展開
+            };
+            
+            historyList.unshift(createdRecord);
+
+            // --- 7. 件数制限（最大5件）オーバーの削除 ---
+            const MAX_HISTORY = 5;
+            if (historyList.length > MAX_HISTORY) {
+                const itemToDelete = historyList.pop(); // 末尾（一番古い）を取り出す
+                const deleteId = itemToDelete.IssueId || itemToDelete.ResultId || itemToDelete.Id;
+                
+                if (deleteId) {
+                    apiDeleteAsync(deleteId).catch(e => console.error("Overflow delete failed", e));
+                }
+            }
+
+            // --- 8. セッション情報の更新 ---
+            const saveObj = {
+                userId: $p.userId(),
+                data: historyList
+            };
+            sessionStorage.setItem(SESSION_KEY_HIST, JSON.stringify(saveObj));
+            console.log("DEBUG: History updated successfully.");
+
+        } catch (e) {
+            console.error("History add failed:", e);
+            // 履歴保存の失敗はメイン処理（交通費保存）を止めるべきではないので、alertは出さずにログのみとするのが一般的
+        }
+    };
+
     //=====================================================================================================================================================
     //関数定義はここまで
     //#endregion

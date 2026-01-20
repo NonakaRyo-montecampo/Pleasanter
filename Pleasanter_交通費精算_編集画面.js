@@ -523,7 +523,7 @@ $p.events.on_editor_load = function () {
                 $histContainer.html('<p style="color:#666; margin:10px;">履歴はありません。</p>');
             } else {
                 let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;">';
-                tableHtml += '<thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="padding:5px;">日付</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th></tr></thead><tbody>';
+                tableHtml += '<thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="width:200px; "padding:5px;">日付</th><th style="width:200px; "padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="padding:5px;">備考</th></tr></thead><tbody>';
                 
                 const limit = (typeof PAGE_SIZE !== 'undefined') ? PAGE_SIZE : 5;
                 historyList.slice(0, limit).forEach(r => {
@@ -539,6 +539,8 @@ $p.events.on_editor_load = function () {
                     };
                     const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
                     let dateStr = r.DateA ? new Date(r.DateA).toLocaleDateString() : '-';
+                    //add
+                    let memoStr = r.Body;
 
                     tableHtml += `
                         <tr style="border-bottom:1px solid #eee;">
@@ -547,7 +549,8 @@ $p.events.on_editor_load = function () {
                             </td>
                             <td style="padding: 5px;">${dateStr}</td>
                             <td style="padding: 5px;">${routeDesc}</td>
-                            <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()}</td>
+                            <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString() + "円"}</td>
+                            <td style="padding: 5px;">${memoStr}</td> <!--add-->
                         </tr>
                     `;
                 });
@@ -601,7 +604,7 @@ $p.events.on_editor_load = function () {
                         </td>
                         <td style="padding: 5px;">${r.Title}</td>
                         <td style="padding: 5px;">${routeDesc}</td>
-                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()}</td>
+                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString() + "円"}</td>
                         <td style="text-align:center; padding: 5px;">
                             <button type="button" class="delete-fav-btn ui-button ui-corner-all ui-widget" 
                                     style="padding: 1px 6px; font-size: 11px; color: white; background-color: #d9534f; border: 1px solid #d43f3a; border-radius: 3px;"
