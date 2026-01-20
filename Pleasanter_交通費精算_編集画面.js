@@ -287,6 +287,107 @@ $p.events.on_editor_load = function () {
     }
     //#endregion
 
+    //#region<子レコード並び替え機能（軽量版）>
+    // =========================================================================
+    // ▼ 子レコード（交通費申請レコード）のドラッグ&ドロップ並び替え
+    //   ・アラートなし、リロードなし、上から1,2,3...と連番を振る
+    // =========================================================================
+    
+    // 定数定義
+    //const CHILD_TABLE_ID = 15339887; // 子テーブルID
+    const SORT_COL_NAME = 'NumB';         // 連番を格納する項目名（精算書内データNo）
+
+    // ▼ ソート機能を適用する関数
+    const initSortableTable = () => {
+        // セレクタ：data-id属性でテーブルを特定
+        const $table = $('table[data-id="' + CHILD_TABLE_ID + '"]');
+        
+        if ($table.length === 0) {
+            return false; // まだ描画されていない
+        }
+
+        const $tbody = $table.find('tbody');
+        
+        // 既に適用済みなら何もしない
+        if ($tbody.hasClass('ui-sortable')) return true;
+
+        // jQuery UI Sortable の適用
+        $tbody.sortable({
+            cursor: "move",
+            axis: "y", // 縦方向のみ移動
+            opacity: 0.8,
+            helper: function(e, tr) {
+                var $originals = tr.children();
+                var $helper = tr.clone();
+                // ドラッグ時に列幅が潰れないように設定
+                $helper.children().each(function(index) {
+                    $(this).width($originals.eq(index).width());
+                });
+                return $helper;
+            },
+            update: async function(event, ui) {
+                // ドロップ時の処理（確認アラートなしで即実行）
+                
+                // 1. 保存中であることを示すため少し薄くする（操作ブロック）
+                $table.css('opacity', '0.5').css('pointer-events', 'none');
+                console.log("DEBUG: Saving new order...");
+
+                try {
+                    // 2. 画面上の並び順通りにIDを取得して更新リスト作成
+                    let updatePromises = [];
+                    
+                    $tbody.find('tr').each(function(index) {
+                        const rowId = $(this).data('id'); // 行ID (RecordId)
+                        const newNum = index + 1;         // 上から 1, 2, 3... と振る（昇順）
+                        
+                        if (rowId) {
+                            // API更新予約（NumBのみ更新）
+                            const promise = $p.apiUpdate({
+                                id: rowId,
+                                data: {
+                                    NumHash: {
+                                        [SORT_COL_NAME]: newNum
+                                    }
+                                }
+                            });
+                            updatePromises.push(promise);
+                        }
+                    });
+
+                    // 3. 一括更新実行（裏側で処理）
+                    await Promise.all(updatePromises);
+                    
+                    console.log("DEBUG: Order saved successfully.");
+
+                } catch (e) {
+                    console.error("Sort update failed:", e);
+                    // 失敗した時だけアラートを出す（気づかないと困るため）
+                    alert("並び替えの保存に失敗しました。通信環境を確認してください。");
+                } finally {
+                    // 4. 保存完了後、見た目を元に戻す（リロードはしない）
+                    $table.css('opacity', '1').css('pointer-events', 'auto');
+                }
+            }
+        }).disableSelection();
+
+        // UI調整：カーソルを移動アイコンにし、マウスオーバー時のスタイルを追加
+        $tbody.find('tr').css('cursor', 'move').attr('title', 'ドラッグして並び替え');
+        
+        console.log("DEBUG: Sortable initialized on child table.");
+        return true;
+    };
+
+    // ▼ 読み込み待機処理
+    let sortInitRetryCount = 0;
+    const sortInitTimer = setInterval(() => {
+        if (initSortableTable() || sortInitRetryCount > 20) {
+            clearInterval(sortInitTimer);
+        }
+        sortInitRetryCount++;
+    }, 500);
+
+    //#endregion
+
     //#region<精算書PDF出力>
     // =========================================================================
     // ▼ PDF出力ボタンの追加と処理
