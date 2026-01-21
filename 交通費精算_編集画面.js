@@ -8,7 +8,9 @@ $p.events.on_editor_load = function () {
     const CLASS_REQUESTDATE = 'DateA';  //「申請日」欄
     const CLASS_MANFIXDATE = 'DateB';  //「承認日(上長)」欄
     const CLASS_GAFIXDATE = 'DateC';  //「承認日(総務部)」欄
+    const CLASS_SUPERIOR = 'ClassB'; //「上長」欄  
     const CLASS_GAID = 'ClassC'; //「承認者」欄
+    const CLASS_USER = 'ClassA'; //「申請者」欄
     const CLASS_CREATOR = 'ClassD'; //「作成者」欄
 
     const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
@@ -37,6 +39,9 @@ $p.events.on_editor_load = function () {
     //「従業員一覧」テーブル
     const WORKERTABLE_ID = 15337991;
     const WORKERTABLE_CLASS_USER = "ClassQ"; //「ユーザーID」項目
+    //自分と上長の「従業員一覧」レコード情報(#region<「従業員一覧」テーブル情報取得(自分＆上長)>内で定義)
+    let myEmployeeDataPromise = null;
+    let supEmployeeDataPromise = null;
 
     // 「お気に入り経路」テーブル
     const FAV_TABLE_ID = 15951290;  // ★お気に入りテーブルID
@@ -105,6 +110,142 @@ $p.events.on_editor_load = function () {
         var dt = new Date();
         return dt.getFullYear() + '/' + (dt.getMonth() + 1) + '/' + dt.getDate();
     }
+
+    //自分の「従業員一覧」レコード取得
+    //<「従業員一覧」テーブル情報取得(自分＆上長)>処理待ち関数
+    //従業員一覧レコードはこの関数から呼び出す。
+    const getMyEmployeeData = async () => {
+        // まだ通信中なら待ってくれるし、
+        // 既に終わっていれば、保存された結果を即座に返してくれます（再通信しません）
+        if (!myEmployeeDataPromise) return null;
+        return await myEmployeeDataPromise;
+    };
+
+    //上長の「従業員一覧」レコード取得
+    //<「従業員一覧」テーブル情報取得(自分＆上長)>処理待ち関数
+    //従業員一覧レコードはこの関数から呼び出す。
+    const getSupEmployeeData = async () => {
+        // まだ通信中なら待ってくれるし、
+        // 既に終わっていれば、保存された結果を即座に返してくれます（再通信しません）
+        if (!supEmployeeDataPromise) return null;
+        return await supEmployeeDataPromise;
+    };
+    //#endregion
+
+    //#region<「従業員一覧」テーブル情報取得(自分＆上長)>
+    (async () => {
+        try {
+            //自分の情報を取得
+            // ★ここで await せず、Promise（通信処理そのもの）を変数に入れる！
+            // こうすると、通信は裏で走り始めます。
+            myEmployeeDataPromise = apiGetAsync({
+                id: WORKERTABLE_ID,
+                data: {
+                    View: {
+                        ColumnFilterHash: {
+                            [WORKERTABLE_CLASS_USER]: JSON.stringify([String($p.userId())])
+                        }
+                    }
+                }
+            }).then(result => {
+                // 取得成功したら、必要なデータ部分だけを返すように加工しておく
+                if (result.Response.Data.length > 0) {
+                    return result.Response.Data[0];
+                }
+                return null;
+            });
+            const supId = $p.getControl(CLASS_SUPERIOR).val();
+            supEmployeeDataPromise = apiGetAsync({
+                id: supId
+            }).then(result => {
+                // 取得成功したら、必要なデータ部分だけを返すように加工しておく
+                if (result.Response.Data.length > 0) {
+                    return result.Response.Data[0];
+                }
+                return null;
+            });
+
+            // 画面制御のために、ここでも結果を待ちたいなら await してもOK
+            // ただし、employeeDataPromise という変数は「Promise」のまま保持されます
+            const myData = await myEmployeeDataPromise;
+            const supData = await supEmployeeDataPromise;
+
+        } catch (e) {
+            console.error("初期データ取得に失敗", e);
+        }
+    })();
+
+    //#endregion
+
+    //#region<申請者or作成者かつ作成中or差し戻しでないときのアクセス制御>
+    // ---------------------------------------------------------------
+    (async () => {
+        // 1. 判定用データの準備
+        const myEmpData = await getMyEmployeeData();
+        const myEmpRecordId = myEmpData ? String(myEmpData.ResultId) : null; // 自分の従業員レコードID
+        
+        const applicantId = $p.getControl(CLASS_USER).val();    // 画面上の「申請者」ID (ClassA)
+        const creatorId   = $p.getControl(CLASS_CREATOR).val(); // 画面上の「作成者」User ID (ClassD)
+        const currentUserId = String($p.userId());              // ログインユーザーID
+        
+        const statusText = $p.getControl('Status').text();      // 現在のステータス名
+
+        // 2. 条件判定
+        // 条件A: ユーザーが「申請者」または「作成者」である
+        const isAuthorizedUser = (myEmpRecordId === applicantId) || (currentUserId === creatorId);
+        
+        // 条件B: ステータスが「作成中」または「差し戻し」である
+        // ※定数は #region<定数定義> で定義済みのものを使用
+        const isEditableStatus = (statusText === STATUS_CREATING || statusText === STATUS_REJECT);
+
+        // 両方の条件を満たしているか？
+        const canEditChild = isAuthorizedUser && isEditableStatus;
+
+        console.log(`DEBUG: Child Access Check -> UserOK:${isAuthorizedUser}, StatusOK:${isEditableStatus}, Result:${canEditChild}`);
+
+        // 3. 編集不可なら各種入力機能を無効化
+        if (!canEditChild) {
+            
+            // (A) 入力支援パネル（経路候補一覧）を非表示にする
+            $('#CustomRouteContainer').remove();
+
+            // (B) ★追加：OCR読取ボタンとファイル入力を非表示にする
+            $('#BtnOcrRead').remove();
+            $('#OcrFileInput').remove();
+
+            // (C) 子レコード一覧のアクセス制御（リンク遷移不可にする）
+            const disableChildLinks = () => {
+                const $table = $('table[data-id="' + CHILD_TABLE_ID + '"]');
+                if ($table.length > 0) {
+                    const $tbody = $table.find('tbody');
+                    // 行に対してクリック禁止スタイルを適用
+                    $tbody.find('tr').css({
+                        'pointer-events': 'none',
+                        'color': '#999',
+                        'background-color': '#f9f9f9'
+                    });
+                    
+                    // リンク（鉛筆アイコン等）も念のため無効化
+                    $tbody.find('a').css('pointer-events', 'none');
+                    
+                    return true;
+                }
+                return false;
+            };
+
+            // 即時実行 + 描画待ちタイマー（最大10秒間、0.5秒おきに監視して適用し続ける）
+            let retryCount = 0;
+            const lockTimer = setInterval(() => {
+                // 念のためタイマー内でも削除コマンドを実行（再描画等で復活した場合の対策）
+                $('#CustomRouteContainer').remove();
+                $('#BtnOcrRead').remove();
+                
+                disableChildLinks();
+                retryCount++;
+                if (retryCount > 20) clearInterval(lockTimer); // 10秒で諦める
+            }, 500);
+        }
+    })();
     //#endregion
 
     //#region<作成者自動入力>
@@ -513,8 +654,9 @@ $p.events.on_editor_load = function () {
 
     //#region<経路呼び出し機能（埋め込みパネル版）>
     // =========================================================================
-    // ▼ 経路選択パネル（履歴対応・キャッシュ版・順序修正済み）
+    // ▼ 経路選択パネル（履歴対応・キャッシュ版・重複対策済み）
     // =========================================================================
+    //<申請者or作成者かつ作成中or差し戻しでないときのアクセス制御>にパネル非表示化を実装済み
 
     // データを保持しておくための変数（キャッシュ）
     let cachedFavRecords = null;
@@ -524,6 +666,9 @@ $p.events.on_editor_load = function () {
 
     if ($p.action() !== 'new' && $targetBtn.length > 0) {
         
+        // ★修正1：既存のパネルがある場合は削除してリセット（重複防止の強化）
+        $('#CustomRouteContainer').remove();
+
         // ---------------------------------------------------------
         // 1. パネル用HTMLの生成と挿入
         // ---------------------------------------------------------
@@ -552,13 +697,25 @@ $p.events.on_editor_load = function () {
             </div>
         `;
 
-        $('#CustomRouteContainer').remove(); 
-        $('#EmbeddedRoutePanel').remove(); 
-        $targetBtn.after(panelHtml);
+        // ★修正2：挿入場所の特定ロジック（ボタンが隠れている場合に対応）
+        // 1. まず「表示されているボタン」を探す
+        let $anchor = $targetBtn.filter(':visible');
+        
+        // 2. もし表示されているボタンがなければ（承認待ち等でhideされている場合）、
+        //    DOM上でその後ろにある要素（クローンされたグレーボタンなど）をターゲットにする
+        if ($anchor.length === 0) {
+            $anchor = $targetBtn.next(); 
+        }
+        
+        // 3. それでもなければ、元の隠れたボタンをターゲットにする
+        if ($anchor.length === 0) {
+            $anchor = $targetBtn;
+        }
 
-        // ---------------------------------------------------------
-        // 2. 関数定義（★ここをタブ初期化より前に移動しました）
-        // ---------------------------------------------------------
+        // 4. ターゲットの「最後の一つ」の後ろに追加（複数マッチ対策）
+        $anchor.last().after(panelHtml);
+
+        // ... (以下、loadHistoryDataなどの関数定義はそのまま変更なし) ...
         
         // ▼ 履歴データの読み込み・描画
         const loadHistoryData = async () => {
@@ -644,7 +801,6 @@ $p.events.on_editor_load = function () {
                     };
                     const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
                     let dateStr = r.DateA ? new Date(r.DateA).toLocaleDateString() : '-';
-                    //add
                     let memoStr = r.Body;
 
                     tableHtml += `
@@ -655,7 +811,7 @@ $p.events.on_editor_load = function () {
                             <td style="padding: 5px;">${dateStr}</td>
                             <td style="padding: 5px;">${routeDesc}</td>
                             <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString() + "円"}</td>
-                            <td style="padding: 5px;">${memoStr}</td> <!--add-->
+                            <td style="padding: 5px;">${memoStr}</td> 
                         </tr>
                     `;
                 });
@@ -774,7 +930,7 @@ $p.events.on_editor_load = function () {
         };
 
         // ---------------------------------------------------------
-        // 3. jQuery UI Tabs の初期化 & イベント (関数定義の後に移動)
+        // 3. jQuery UI Tabs の初期化 & イベント
         // ---------------------------------------------------------
         $('#RouteTabs').tabs({
             activate: function(event, ui) {
@@ -805,10 +961,8 @@ $p.events.on_editor_load = function () {
             var $icon = $('#RoutePanelToggleIcon');
             $panel.slideToggle(200, function() {
                 if ($panel.is(':visible')) {
-                    //$icon.removeClass('ui-icon-triangle-1-e').addClass('ui-icon-triangle-1-s');
                     $icon.removeClass('ui-icon-circle-plus').addClass('ui-icon-circle-minus');
                 } else {
-                    //$icon.removeClass('ui-icon-triangle-1-s').addClass('ui-icon-triangle-1-e');
                     $icon.removeClass('ui-icon-circle-minus').addClass('ui-icon-circle-plus');
                 }
             });
