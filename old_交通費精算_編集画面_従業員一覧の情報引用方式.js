@@ -1,17 +1,17 @@
-// 交通費申請　編集画面（ユーザーID移行版）
+// 交通費申請　編集画面
 $p.events.on_editor_load = function () {
 
     //#region<定数定義>
     // =========================================================================
     // 【設定エリア】
     // =========================================================================
-    const CLASS_REQUESTDATE = 'DateA';  //「申請日」
-    const CLASS_MANFIXDATE = 'DateB';  //「承認日(上長)」
-    const CLASS_GAFIXDATE = 'DateC';  //「承認日(総務部)」
-    const CLASS_SUPERIOR = 'ClassB'; //「上長」(User ID)
-    const CLASS_GAID = 'ClassC'; //「承認者」(User ID)
-    const CLASS_USER = 'ClassA'; //「申請者」(User ID)
-    const CLASS_CREATOR = 'ClassD'; //「作成者」(User ID)
+    const CLASS_REQUESTDATE = 'DateA';  //「申請日」欄
+    const CLASS_MANFIXDATE = 'DateB';  //「承認日(上長)」欄
+    const CLASS_GAFIXDATE = 'DateC';  //「承認日(総務部)」欄
+    const CLASS_SUPERIOR = 'ClassB'; //「上長」欄  
+    const CLASS_GAID = 'ClassC'; //「承認者」欄
+    const CLASS_USER = 'ClassA'; //「申請者」欄
+    const CLASS_CREATOR = 'ClassD'; //「作成者」欄
 
     const GA_DEPT_NAME = '総務管理部';  
     
@@ -39,9 +39,9 @@ $p.events.on_editor_load = function () {
         approvedDate: 'DateB'
     };
 
-    //「従業員一覧」テーブル（部署判定のためだけに使用）
+    //「従業員一覧」テーブル
     const WORKERTABLE_ID = 15337991;
-    const WORKERTABLE_CLASS_USER = "ClassQ"; //「ユーザーID」が格納されている項目
+    const WORKERTABLE_CLASS_USER = "ClassQ"; //「ユーザーID」項目
     const WORKERTABLE_CLASS_DEPT = "ClassB"; //「部署」項目
 
     // 「お気に入り経路」テーブル
@@ -56,23 +56,29 @@ $p.events.on_editor_load = function () {
     const PAGE_SIZE = 5; 
 
     // =========================================================================
-    // 指定項目読み取り専用化
+    //指定項目読み取り専用化
     $p.getControl(CLASS_MANFIXDATE).prop('readonly', true).css({'pointer-events': 'none', 'background-color': '#eee'});
     $p.getControl(CLASS_GAFIXDATE).prop('readonly', true).css({'pointer-events': 'none', 'background-color': '#eee'});
     $p.getControl(CLASS_GAID).prop('readonly', true).css({'pointer-events': 'none', 'background-color': '#eee'});
     
-    // 現在のステータス取得
+    //現在のステータス取得
     const currentStatus = $p.getControl('Status').text();
     //#endregion
 
-    //#region <【重要】初期表示時のチラつき防止対策>
+    //#region <【重要】初期表示時のチラつき防止対策 (CSS注入)>
+    // =========================================================================
+    // ▼ JavaScriptの判定を待たずに、まずはCSSで「使用不可」に見せる
+    // =========================================================================
     const LOCK_STYLE_ID = 'temp-child-lock-style';
     const lockCss = `
         <style id="${LOCK_STYLE_ID}">
+            /* 子テーブル操作無効化 */
             table[data-id="${CHILD_TABLE_ID}"] tbody tr { pointer-events: none !important; color: #999 !important; background-color: #f9f9f9 !important; }
             table[data-id="${CHILD_TABLE_ID}"] tbody a { pointer-events: none !important; cursor: default !important; text-decoration: none !important; color: #999 !important; }
+            /* コマンドボタンを一時的に隠す */
             #MainCommands button { display: none; }
             #MainCommands button#GoBack { display: inline-block; }
+            /* ★追加：子レコード作成ボタン（青いボタン）も隠す */
             button[data-to-site-id="${CHILD_TABLE_ID}"] { display: none; }
         </style>
     `;
@@ -80,6 +86,7 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region<関数定義>
+    // ▼Promise化用のヘルパー関数
     const apiGetAsync = (jsonfile) => {
         return new Promise((resolve, reject) => {
             jsonfile.done = function(data) { resolve(data); };
@@ -89,12 +96,19 @@ $p.events.on_editor_load = function () {
     };
     const apiUpdateAsync = (id, data) => {
         return new Promise((resolve, reject) => {
-            $p.apiUpdate({ id: id, data: data, done: function(data) { resolve(data); }, fail: function(data) { reject(data); } });
+            $p.apiUpdate({
+                id: id, data: data,
+                done: function(data) { resolve(data); },
+                fail: function(data) { reject(data); }
+            });
         });
     };
     const apiDeleteAsync = (id) => {
         return new Promise((resolve, reject) => {
-            $p.apiDelete({ id: id, done: function(data) { resolve(data); }, fail: function(data) { reject(data); } });
+            $p.apiDelete({
+                id: id, done: function(data) { resolve(data); },
+                fail: function(data) { reject(data); }
+            });
         });
     };
     function formatDate(dateStr) {
@@ -103,77 +117,77 @@ $p.events.on_editor_load = function () {
         if (isNaN(date.getDate())) return dateStr; 
         return (date.getMonth() + 1) + '/' + date.getDate();
     }
+    
+    const getMyEmployeeData = async () => {
+        if (!myEmployeeDataPromise) return null;
+        return await myEmployeeDataPromise;
+    };
+    const getSupEmployeeData = async () => {
+        if (!supEmployeeDataPromise) return null;
+        return await supEmployeeDataPromise;
+    };
+    //#endregion
+
+    //#region<「従業員一覧」テーブル情報取得(自分＆上長)>
+    (async () => {
+        try {
+            // 自分の情報を取得
+            myEmployeeDataPromise = apiGetAsync({
+                id: WORKERTABLE_ID,
+                data: { View: { ColumnFilterHash: { [WORKERTABLE_CLASS_USER]: JSON.stringify([String($p.userId())]) } } }
+            }).then(result => (result.Response.Data.length > 0) ? result.Response.Data[0] : null);
+            
+            // 上長の情報を取得
+            const supId = $p.getControl(CLASS_SUPERIOR).val();
+            if (supId) {
+                supEmployeeDataPromise = apiGetAsync({ id: supId }).then(result => (result.Response.Data.length > 0) ? result.Response.Data[0] : null);
+            } else {
+                supEmployeeDataPromise = Promise.resolve(null);
+            }
+
+            await myEmployeeDataPromise;
+            await supEmployeeDataPromise;
+        } catch (e) { console.error("初期データ取得に失敗", e); }
+    })();
     //#endregion
 
     //#region<メイン処理：アクセス制御とUI構築>
+    // =========================================================================
+    // ▼ ここで全ての権限ロジックを一元管理します
+    // =========================================================================
     (async () => {
-        // ---------------------------------------------------------------
-        // 1. 情報取得（キャッシュ対応版）
-        // ---------------------------------------------------------------
-        const currentUserId = String($p.userId()); // ログインユーザーID
-        let myDept = '';
+        // 1. ユーザー情報の特定
+        const myEmpData = await getMyEmployeeData();
+        const myEmpRecordId = myEmpData ? String(myEmpData.ResultId) : null; 
+        const myDept = myEmpData ? myEmpData[WORKERTABLE_CLASS_DEPT] : '';
 
-        // キャッシュキーの定義
-        const SESSION_KEY_MY_DEPT = 'TrafficApp_MyDept_' + currentUserId;
+        const applicantId = $p.getControl(CLASS_USER).val();    // 申請者ID
+        const creatorId   = $p.getControl(CLASS_CREATOR).val(); // 作成者ID
+        const currentUserId = String($p.userId());              // ログインユーザーID
+        const superiorRecordId = $p.getControl(CLASS_SUPERIOR).val(); // 上長ID
 
-        // まずセッションストレージ（ブラウザの記憶）を見る
-        const cachedDept = sessionStorage.getItem(SESSION_KEY_MY_DEPT);
-
-        if (cachedDept) {
-            // キャッシュがあれば通信しない！
-            myDept = cachedDept;
-            console.log("DEBUG: Load Dept from Cache: " + myDept);
-        } else {
-            // キャッシュがなければAPI通信する
-            try {
-                const result = await apiGetAsync({
-                    id: WORKERTABLE_ID,
-                    data: { 
-                        View: { 
-                            ColumnFilterHash: { [WORKERTABLE_CLASS_USER]: JSON.stringify([currentUserId]) } 
-                        } 
-                    }
-                });
-                if (result.Response.Data.length > 0) {
-                    myDept = result.Response.Data[0][WORKERTABLE_CLASS_DEPT];
-                    // 取得できたら保存する
-                    sessionStorage.setItem(SESSION_KEY_MY_DEPT, myDept);
-                    console.log("DEBUG: Fetch Dept from API & Saved: " + myDept);
-                }
-            } catch (e) {
-                console.error("部署情報の取得に失敗", e);
-                // 429エラー等の場合、ここに来るため myDept は '' のまま
-            }
-        }
-
-        // ---------------------------------------------------------------
-        // 2. 権限判定
-        // ---------------------------------------------------------------
-        const applicantId = String($p.getControl(CLASS_USER).val() || ''); 
-        const creatorId   = String($p.getControl(CLASS_CREATOR).val() || '');
-        const superiorId  = String($p.getControl(CLASS_SUPERIOR).val() || '');
-
-        // ロール判定
-        const isApplicant = (currentUserId === applicantId) || (currentUserId === creatorId);
-        const isSuperior = (superiorId !== '' && currentUserId === superiorId);
+        // 2. ロール判定
+        const isApplicant = (myEmpRecordId === applicantId) || (currentUserId === creatorId);
+        const isSuperior = (superiorRecordId && myEmpRecordId === superiorRecordId);
         const isGeneralAffairs = (myDept === GA_DEPT_NAME);
 
-        // ステータス判定
+        // 3. ステータス判定
         const st = $p.getControl('Status').text(); 
-        const isStatusEdit = (st === STATUS_CREATING || st === STATUS_REJECT); 
-        const isStatusApproval = (st === STATUS_APPROVAL); 
-        const isStatusPayment = (st === STATUS_UNDERREV); 
-        const isStatusCompleted = (st === STATUS_COMPLETED); 
+        const isStatusEdit = (st === STATUS_CREATING || st === STATUS_REJECT); // 作成中・差し戻し
+        const isStatusApproval = (st === STATUS_APPROVAL); // 承認待ち
+        const isStatusPayment = (st === STATUS_UNDERREV); // 決済待ち
+        const isStatusCompleted = (st === STATUS_COMPLETED); // 完了
 
-        console.log(`=== Access Control (User ID Mode) ===`);
-        console.log(`Me: ${currentUserId}, Dept: "${myDept}"`); // Deptが取れているか確認
-        console.log(`Target -> App: "${applicantId}", Sup: "${superiorId}"`);
-        console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isGeneralAffairs}`);
-        console.log(`=====================================`);
+        console.log(`=== Access Control Debug ===`);
+        console.log(`User: ${$p.userId()}, Dept: ${myDept}`);
+        console.log(`Status: "${st}"`);
+        console.log(`Role Checks -> Applicant: ${isApplicant}, Superior: ${isSuperior}, GA: ${isGeneralAffairs}`);
+        console.log(`ID Checks -> MyEmpID: ${myEmpRecordId}, ApplicantID: ${applicantId}, CreatorID: ${creatorId}, SuperiorID: ${superiorRecordId}`);
+        console.log(`============================`);
 
-        // 3. 権限付与ロジック
-        let allowEditFields = false; 
-        let showProcessButtons = false; 
+        // 4. 権限付与ロジック（ホワイトリスト方式）
+        let allowEditFields = false; // 入力項目の編集許可
+        let showProcessButtons = false; // プロセスボタンの表示許可
 
         if (isStatusEdit && isApplicant) {
             allowEditFields = true;
@@ -188,19 +202,27 @@ $p.events.on_editor_load = function () {
             showProcessButtons = true; 
         }
 
-        // 4. 画面制御実行
+        // 5. 画面制御の実行
+
+        // (A) 入力項目のロック制御とUI構築
         if (allowEditFields) {
+            // ★編集許可：初期ロックを解除
             $('#' + LOCK_STYLE_ID).remove();
             
+            // ★ボタンの表示と装飾（ここで行うことで不正表示を防ぐ）
             var $targetBtn = $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]');
             if ($targetBtn.length > 0) {
+                // 初期CSSで消えているので show() する
                 $targetBtn.show();
                 $targetBtn.contents().filter(function() { return this.nodeType === 3; }).replaceWith(' 交通費情報を入力するにはこちらをクリック');
                 $targetBtn.css({ 'background-color': '#0056b3', 'background-image': 'none', 'border-color': '#004494', 'color': '#ffffff', 'font-weight': 'bold', 'padding': '5px 15px' });
             }
+
+            // 入力支援UI（OCR・パネル）の構築
             initInputSupportUI($targetBtn);
 
         } else {
+            // ★編集不可：さらに親画面の入力項目を強力にロック
             const $fields = $('#FieldSetGeneral');
             $fields.find('input, select, textarea').prop('readonly', true);
             $fields.find('input, select, textarea, label').css({
@@ -211,26 +233,31 @@ $p.events.on_editor_load = function () {
             $fields.find('.ui-datepicker-trigger, .ui-icon-close').hide();
         }
 
+        // (B) ボタンの表示制御
         if (showProcessButtons) {
+            // コマンドボタンを再表示
             $('#MainCommands button').show();
-            if (!allowEditFields) {
-                $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]').hide();
-            }
         }
 
+        // PDFボタンは全員（あるいは特定条件）に出すならここで個別にshow
         $('#BtnPrintPdfParent').show();
 
     })();
     //#endregion
 
-    //#region<UI構築関数群 (OCR・履歴パネル)>
-    // ※この部分は変更ありません（ID比較部分以外）
+    //#region<UI構築関数群 (許可された場合のみ実行)>
+    // 引数としてボタンオブジェクトを受け取るように変更
     const initInputSupportUI = ($targetBtn) => {
+        
         if ($targetBtn.length === 0) return;
 
-        // --- 1. 経路選択パネル ---
+        // ---------------------------------------------------------
+        // 1. 経路選択パネルの作成
+        // ---------------------------------------------------------
         if ($('#CustomRouteContainer').length === 0) {
+            
             let cachedFavRecords = null;
+
             const panelHtml = `
                 <div id="CustomRouteContainer" style="clear: both; margin-top: 20px;">
                     <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; color: #333; cursor: pointer; user-select: none;">
@@ -238,30 +265,40 @@ $p.events.on_editor_load = function () {
                     </h4>
                     <div id="EmbeddedRoutePanel" style="border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; border-radius: 4px;">
                         <div id="RouteTabs" style="font-size: 0.9em; background: transparent; border: none;">
-                            <ul><li><a href="#tab-history">利用経路履歴</a></li><li><a href="#tab-fav">お気に入り経路</a></li></ul>
-                            <div id="tab-history" style="min-height: 150px; padding: 10px 0;"><p id="hist-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
-                            <div id="tab-fav" style="min-height: 150px; padding: 10px 0; border-top: none;"><p id="fav-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
+                            <ul>
+                                <li><a href="#tab-history">利用経路履歴</a></li>
+                                <li><a href="#tab-fav">お気に入り経路</a></li>
+                            </ul>
+                            <div id="tab-history" style="min-height: 150px; padding: 10px 0;">
+                                <p id="hist-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p>
+                            </div>
+                            <div id="tab-fav" style="min-height: 150px; padding: 10px 0; border-top: none;">
+                                <p id="fav-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p>
+                            </div>
                         </div>
                     </div>
                     <h4 style="margin-top: 30px; margin-bottom: 10px; font-weight: bold; color: #333; border-bottom: 2px solid #0056b3; padding-bottom: 5px; width: 100%;">
                         <span class="ui-icon ui-icon-note" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>登録中の交通費情報
                     </h4>
-                </div>`;
-            
+                </div>
+            `;
+
+            // 挿入実行
             let $anchor = $targetBtn.filter(':visible');
             if ($anchor.length === 0) $anchor = $targetBtn.next(); 
             if ($anchor.length === 0) $anchor = $targetBtn;
             $anchor.last().after(panelHtml);
 
-            // 履歴データ読込 (User IDを使用)
+            // --- 内部関数定義 ---
             const loadHistoryData = async () => {
                 const $histContainer = $('#tab-history');
                 const currentUserId = $p.userId();
                 const SESSION_KEY_HIST = 'TrafficApp_History';
+
                 let historyList = [];
                 const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
-                let needsApiFetch = true;
                 
+                let needsApiFetch = true;
                 if (sessionData) {
                     const parsed = JSON.parse(sessionData);
                     if (parsed.userId === currentUserId && parsed.data) {
@@ -277,7 +314,6 @@ $p.events.on_editor_load = function () {
                             id: HIST_TABLE_ID,
                             data: {
                                 View: {
-                                    // ★修正：HIST_USER_COL には User IDが入っている前提
                                     ColumnFilterHash: { [HIST_USER_COL]: JSON.stringify([String(currentUserId)]) },
                                     ColumnSorterHash: { CreatedTime: 'desc' }
                                 },
@@ -287,25 +323,26 @@ $p.events.on_editor_load = function () {
                         historyList = result.Response.Data || [];
                         sessionStorage.setItem(SESSION_KEY_HIST, JSON.stringify({ userId: currentUserId, data: historyList }));
                     } catch (e) {
+                        console.error(e);
                         $histContainer.html('<p style="color:red; margin:10px;">履歴の読み込みに失敗しました。</p>');
                         return;
                     }
                 }
-                // (描画処理は共通なので省略...前と同じHTML生成ロジックが入ります)
-                // ※容量節約のため中略しますが、前のコードの描画部分をそのまま使ってください。
-                // 変更点： data属性にセットするJSON内の ClassE, ClassC などはUser IDのまま渡せばOK
-                
+
                 $histContainer.empty();
                 if (historyList.length === 0) {
                     $histContainer.html('<p style="color:#666; margin:10px;">履歴はありません。</p>');
                 } else {
-                    let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px;"></th><th>日付</th><th>経路</th><th>金額</th><th>備考</th></tr></thead><tbody>';
-                    const limit = 5;
+                    let tableHtml = '<p style="color:#666; margin:10px;">直近' + HIST_REGISTQTY + '件の登録経路情報が表示されます。</p>';
+                    tableHtml += '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;">';
+                    tableHtml += '<thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="width:200px; "padding:5px;">日付</th><th style="width:200px; "padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="padding:5px;">備考</th></tr></thead><tbody>';
+                    
+                    const limit = (typeof PAGE_SIZE !== 'undefined') ? PAGE_SIZE : 5;
                     historyList.slice(0, limit).forEach(r => {
                         const routeDesc = (r.ClassA || '') + ' → ' + (r.ClassB || '') + ' <span style="color:#666;">(' + (r.ClassC || '-') + ')</span>'; 
                         const copyData = {
                             ClassA: r.ClassA, ClassB: r.ClassB, ClassD: r.ClassC, NumC: r.NumA, 
-                            ClassE: $p.getControl(CLASS_USER).val(), ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
+                            ClassE: $p.getControl('ClassA').val(), ClassC: $p.getControl('ClassB').val(), 
                             ClassI: String($p.id()), _mode: 'copy'
                         };
                         const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
@@ -359,19 +396,26 @@ $p.events.on_editor_load = function () {
                     cachedFavRecords = result.Response.Data || [];
                     renderFavPage(1);
                 } catch (e) {
+                    console.error(e);
                     $favContainer.html('<p style="color:red; margin:10px;">データの読み込みに失敗しました。</p>');
                 }
             };
 
+            // Tabs初期化
             $('#RouteTabs').tabs({
                 activate: function(event, ui) {
                     const panelId = ui.newPanel.attr('id');
                     if (panelId === 'tab-history') loadHistoryData();
-                    else if (panelId === 'tab-fav') { if (cachedFavRecords === null) fetchAllFavData(); else renderFavPage(1); }
+                    else if (panelId === 'tab-fav') {
+                        if (cachedFavRecords === null) fetchAllFavData();
+                        else renderFavPage(1);
+                    }
                 }
             });
+            // 初期ロード
             loadHistoryData();
 
+            // イベントハンドラ登録
             $('#RoutePanelHeader').on('click', function() {
                 var $panel = $('#EmbeddedRoutePanel');
                 var $icon = $('#RoutePanelToggleIcon');
@@ -386,21 +430,29 @@ $p.events.on_editor_load = function () {
             });
             $(document).off('click', '.delete-fav-btn').on('click', '.delete-fav-btn', async function() {
                 if (!confirm("本当に削除しますか？")) return;
+                const targetId = String($(this).data('id'));
+                const currentPage = $(this).data('page');
                 try {
-                    await apiDeleteAsync(String($(this).data('id')));
-                    cachedFavRecords = cachedFavRecords.filter(r => String(r.IssueId || r.ResultId || r.Id) !== String($(this).data('id')));
-                    renderFavPage($(this).data('page'));
-                } catch (e) { alert("削除に失敗しました。"); }
+                    await apiDeleteAsync(targetId);
+                    cachedFavRecords = cachedFavRecords.filter(r => String(r.IssueId || r.ResultId || r.Id) !== targetId);
+                    renderFavPage(currentPage);
+                } catch (e) {
+                    console.error(e);
+                    alert("削除に失敗しました。");
+                }
             });
             $(document).off('click', '.select-route-btn').on('click', '.select-route-btn', function() {
                 const data = $(this).data('json');
                 data.ParentId = $p.id();
                 sessionStorage.setItem('TrafficApp_CopyData', JSON.stringify(data));
-                window.location.href = '/fs/Items/' + CHILD_TABLE_ID + '/New?' + LINK_COLUMN_NAME + '=' + data.ParentId;
+                const linkCol = (typeof LINK_COLUMN_NAME !== 'undefined') ? LINK_COLUMN_NAME : 'ClassI';
+                window.location.href = '/fs/Items/' + CHILD_TABLE_ID + '/New?' + linkCol + '=' + data.ParentId;
             });
         }
 
-        // --- 2. OCRボタン ---
+        // ---------------------------------------------------------
+        // 2. OCRボタンの作成
+        // ---------------------------------------------------------
         if ($('#BtnOcrRead').length === 0) {
             const ocrBtnHtml = `
                 <button id="BtnOcrRead" class="button button-icon ui-button ui-corner-all ui-widget" style="margin-left: 10px;">
@@ -483,14 +535,13 @@ $p.events.on_editor_load = function () {
     };
     //#endregion
 
-    //#region<自動入力系（修正済み）>
-    
-    // 作成者自動入力 (User IDセット) コピー作成時とかに使ってみるか？
+    //#region<作成者自動入力>
     if($p.getControl(CLASS_CREATOR).val() === ''){
         $p.set($p.getControl(CLASS_CREATOR), $p.userId());
     }
+    //#endregion
 
-    // 承認日・承認者自動入力 (通信なしでOK!)
+    //#region<承認日、承認者入力>
     if(currentStatus === STATUS_UNDERREV && $p.getControl(CLASS_MANFIXDATE).val() === ''){
         const today = new Date();
         $p.set($p.getControl(CLASS_MANFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
@@ -502,7 +553,17 @@ $p.events.on_editor_load = function () {
     if(currentStatus === STATUS_COMPLETED && $p.getControl(CLASS_GAFIXDATE).val() === ''){
         const today = new Date();
         $p.set($p.getControl(CLASS_GAFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
-        $p.set($p.getControl(CLASS_GAID), $p.userId());
+        let userId = $p.userId();
+        $p.apiGet({
+            id: WORKERTABLE_ID,
+            data: { View: { "ColumnFilterHash": { [WORKERTABLE_CLASS_USER]: "[\"" + userId + "\"]" } } },
+            done: function (data) {
+                if (data.Response.Data && data.Response.Data.length > 0) {
+                    $p.set($p.getControl(CLASS_GAID), data.Response.Data[0].ResultId);
+                } 
+            },
+            fail: function(data){ alert('通信が失敗しました'); }
+        });
     }
     else if(currentStatus !== STATUS_COMPLETED && $p.getControl(CLASS_GAFIXDATE).val() !== ''){
         $p.set($p.getControl(CLASS_GAFIXDATE), '');
@@ -514,7 +575,7 @@ $p.events.on_editor_load = function () {
         $('#MainCommands').append('<button id="BtnPrintPdfParent" class="button button-icon ui-button ui-corner-all ui-widget"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-document"></span>PDF出力</button>');
     }
     $('#BtnPrintPdfParent').on('click', async function() {
-                var parentId = $p.id();
+        var parentId = $p.id();
         if (!parentId) { alert('レコードが保存されていません。'); return; }
         var userName = $p.getControl(PARENT_USER_COLUMN).find('option:selected').text().trim();
         if (!userName) userName = $p.getControl(PARENT_USER_COLUMN).text().trim();

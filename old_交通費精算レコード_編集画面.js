@@ -1,14 +1,6 @@
 // 交通費申請レコード　編集画面
 $p.events.on_editor_load = function () {
     
-    //#region<【重要】リンクエリアの非表示（セキュリティ対策）>
-    // =========================================================================
-    // ▼ 画面下部の「リンク」セクションを強制的に非表示にする
-    //   理由：ここから「従業員一覧」等のマスタ情報へ遷移できてしまうのを防ぐため
-    // =========================================================================
-    $('head').append('<style>#Links { display: none !important; }</style>');
-    //#endregion
-
     //#region<定数定義>
     //=====================================================================================================================================================
     const gasUrl = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec'; // ★あなたのGASのURL
@@ -225,6 +217,142 @@ $p.events.on_editor_load = function () {
         const params = new URLSearchParams(window.location.search);
         return params.get('LinkId');
     };
+    // ▼ 履歴登録処理関数（子画面用）
+    /*
+    const addToHistoryAsync = async () => {
+        // 保存しようとしているデータ
+        const newRecord = {
+            Title: $p.getControl('Title').val(), // 行先
+            DateA: $p.getControl('StartTime').val(), // 利用日
+            ClassA: $p.getControl(CLASS_DEP).val(),   // 出発
+            ClassB: $p.getControl(CLASS_ARR).val(),   // 到着
+            ClassC: $p.getControl(CLASS_TRAFFWAY).val(),   // 交通手段(履歴側はClassCと仮定)
+            NumA:   parseInt($p.getControl(CLASS_COST_ONEWAY).val().replace(/,/g, '')), // 金額
+            ClassD: $p.userId(),                      // 登録ユーザー
+            Body: $p.getControl('Body').val(),   // 備考
+        };
+
+        // 必須項目が空なら履歴保存しない
+        if(!newRecord.ClassA || !newRecord.ClassB) {
+            console.log("DEBUG: must item is empty.");
+            return;
+        }
+
+        // 1. セッションから履歴を取得（最新状態を確認するため、できればAPIから取りたいが、節約のためセッション利用）
+        // ※ただし、整合性を保つため、ここは「追加」のみ行い、セッションの更新は次回親画面ロード時に任せる手もあるが、
+        //   要望通りセッションも更新する。
+        let historyList = [];
+        const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
+        if (sessionData) {
+            historyList = JSON.parse(sessionData).data || [];
+        }
+        
+        // --- 2. セッションから現在の履歴リストを取得 ---
+        let historyList = [];
+        const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
+        if (sessionData) {
+            try {
+                const parsed = JSON.parse(sessionData);
+                // ユーザーIDが一致する場合のみ採用（別ユーザーでのログイン対策）
+                if (String(parsed.userId) === String($p.userId())) {
+                    historyList = parsed.data || [];
+                }
+            } catch (e) {
+                historyList = [];
+            }
+        }
+
+        // 2. 重複チェック（行先・手段・出発・到着・金額）
+        // ※ID等は持っていないので中身で比較
+        const isDuplicate = historyList.some(r => {
+            return r.ClassA === newRecord.ClassA &&
+                   r.ClassB === newRecord.ClassB &&
+                   r.ClassC === newRecord.ClassC && // 手段
+                   r.NumA   === newRecord.NumA;
+        });
+        
+        if (isDuplicate) {
+            console.log("DEBUG: History duplicate. Skip.");
+            return;
+        }
+
+        // 3. APIで新規登録 (非同期で実行)
+        try {
+            const apiData = {
+                Title: newRecord.Title,
+                DateHash:{
+                    DateA: newRecord.DateA,
+                },
+                ClassHash: {
+                    ClassA: newRecord.ClassA,
+                    ClassB: newRecord.ClassB,
+                    ClassC: newRecord.ClassC,
+                    ClassD: newRecord.ClassD,
+                },
+                NumHash: {                
+                    NumA: newRecord.NumA
+                },
+                Body: newRecord.Body//$p.getControl('Body').val() // 備考 (ルート項目なのでHashの外)
+            };
+
+            const res = await apiCreateAsync({
+                id: HIST_TABLE_ID,
+                data: apiData
+            });
+            console.log("DEBUG: History Create: fin making new record");
+            console.log(res);
+            
+           //4. 作成したレコードを含めたユーザーの全情報の取得
+            try {
+                const result = await apiGetAsync({
+                    id: HIST_TABLE_ID,
+                    data: {
+                        View: {
+                            ColumnFilterHash: {
+                                [HIST_USER_COL]: JSON.stringify([String($p.userId())])
+                            },
+                            ColumnSorterHash: { CreatedTime: 'desc' }
+                        },
+                        PageSize: 10
+                    }
+                });
+                historyList = result.Response.Data || [];
+            } catch (e) {
+                console.log("DEBUG: fail to read history.");
+                console.error(e);
+                return;
+            }
+
+            // 4. セッション配列の先頭に追加
+            //historyList.unshift(createdRecord);
+
+            // 5. 5件を超えていたら、一番古いものをAPIで削除 ＆ 配列から削除
+            if (historyList.length > 5) {
+                const itemToDelete = historyList.pop(); // 末尾（一番古い）を取得
+                const deleteId = itemToDelete.ResultId;
+                console.log("DEBUG: delete record ID: " + deleteId);
+                if (deleteId) {
+                    // 削除API実行（awaitしなくてもよいが、安全のため）
+                    await apiDeleteAsync(deleteId).catch(e => console.error("History delete failed", e));
+                }
+            }
+
+            console.log("DEBUG: History Create: Start to save Obj");
+            // 6. セッション保存
+            const saveObj = {
+                userId: $p.userId(),
+                data: historyList
+            };
+            sessionStorage.setItem(SESSION_KEY_HIST, JSON.stringify(saveObj));
+            console.log("DEBUG: History updated.");
+            //alert("DEBUG: addToHistoryAsync() fin");
+
+        } catch (e) {
+            console.error("History add failed:", e);
+            alert("ERROR: 登録履歴の処理中にエラーが発生しました。: addToHistoryAsync()");
+        }
+    };
+    */
     
     // ▼ 履歴登録処理関数（重複入替・最新先頭維持版）
     const addToHistoryAsync = async () => {
@@ -312,6 +440,8 @@ $p.events.on_editor_load = function () {
             
             if (!createdId) {
                 console.warn("DEBUG: Created ID not found in response.", res);
+                // IDが取れなくても、画面上の履歴リスト更新のために擬似IDで続行させる手もあるが、
+                // 次回の削除ができないのでここではエラーとするか、APIの仕様に合わせて調整してください。
             }
 
             // --- 6. 履歴リストの先頭に追加 ---
@@ -345,6 +475,7 @@ $p.events.on_editor_load = function () {
 
         } catch (e) {
             console.error("History add failed:", e);
+            // 履歴保存の失敗はメイン処理（交通費保存）を止めるべきではないので、alertは出さずにログのみとするのが一般的
         }
     };
 
@@ -427,6 +558,12 @@ $p.events.on_editor_load = function () {
                 } else if (parentId) {
                     $p.set($p.getControl(COL_LINK_TRANSREPO), parentId);
                 }
+                /*
+                // 使用済みのsessionStorageをクリア
+                if (previousDataJson) {
+                    sessionStorage.removeItem('TrafficApp_CopyData');
+                }
+                */
 
             } catch (e) {
                 console.error('自動入力処理でエラー:', e);
