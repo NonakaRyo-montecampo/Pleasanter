@@ -1,4 +1,4 @@
-// 交通費申請　編集画面（ユーザーID移行・見やすさ改善版）
+// 交通費申請　編集画面（ユーザーID移行・見やすさ改善版・順序修正済み）
 $p.events.on_editor_load = function () {
 
     //#region<定数定義>
@@ -73,7 +73,6 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region <初期表示時のチラつき防止対策>
-
     const LOCK_STYLE_ID = 'temp-child-lock-style';
     const lockCss = `
         <style id="${LOCK_STYLE_ID}">
@@ -117,123 +116,8 @@ $p.events.on_editor_load = function () {
         if (isNaN(date.getDate())) return dateStr; 
         return (date.getMonth() + 1) + '/' + date.getDate();
     }
-    //#endregion
 
-    //#region<メイン処理：アクセス制御とUI構築>
-    (async () => {
-        // ---------------------------------------------------------------
-        // 1. 情報取得（キャッシュ対応版）
-        // ---------------------------------------------------------------
-        const currentUserId = String($p.userId()); // ログインユーザーID
-        let myDept = '';
-
-        const SESSION_KEY_MY_DEPT = 'TrafficApp_MyDept_' + currentUserId;
-        const cachedDept = sessionStorage.getItem(SESSION_KEY_MY_DEPT);
-
-        if (cachedDept) {
-            myDept = cachedDept;
-            console.log("DEBUG: Load Dept from Cache: " + myDept);
-        } else {
-            try {
-                const result = await apiGetAsync({
-                    id: WORKERTABLE_ID,
-                    data: { 
-                        View: { 
-                            ColumnFilterHash: { [WORKERTABLE_CLASS_USER]: JSON.stringify([currentUserId]) } 
-                        } 
-                    }
-                });
-                if (result.Response.Data.length > 0) {
-                    myDept = result.Response.Data[0][WORKERTABLE_CLASS_DEPT];
-                    sessionStorage.setItem(SESSION_KEY_MY_DEPT, myDept);
-                    console.log("DEBUG: Fetch Dept from API & Saved: " + myDept);
-                }
-            } catch (e) {
-                console.error("部署情報の取得に失敗", e);
-            }
-        }
-
-        // ---------------------------------------------------------------
-        // 2. 権限判定
-        // ---------------------------------------------------------------
-        const applicantId = String($p.getControl(CLASS_USER).val() || ''); 
-        const creatorId   = String($p.getControl(CLASS_CREATOR).val() || '');
-        const superiorId  = String($p.getControl(CLASS_SUPERIOR).val() || '');
-
-        // ロール判定
-        const isApplicant = (currentUserId === applicantId) || (currentUserId === creatorId);
-        const isSuperior = (superiorId !== '' && currentUserId === superiorId);
-        const isGeneralAffairs = (myDept === GA_DEPT_NAME);
-
-        // ステータス判定
-        const st = $p.getControl('Status').text(); 
-        const isStatusEdit = (st === STATUS_CREATING || st === STATUS_REJECT); 
-        const isStatusApproval = (st === STATUS_APPROVAL); 
-        const isStatusPayment = (st === STATUS_UNDERREV); 
-        const isStatusCompleted = (st === STATUS_COMPLETED); 
-
-        console.log(`=== Access Control (User ID Mode) ===`);
-        console.log(`Me: ${currentUserId}, Dept: "${myDept}"`);
-        console.log(`Target -> App: "${applicantId}", Sup: "${superiorId}"`);
-        console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isGeneralAffairs}`);
-        console.log(`=====================================`);
-
-        // 3. 権限付与ロジック
-        let allowEditFields = false; 
-        let showProcessButtons = false; 
-
-        if (isStatusEdit && isApplicant) {
-            allowEditFields = true;
-            showProcessButtons = true;
-        }
-        else if (isStatusApproval && isSuperior) {
-            allowEditFields = false;
-            showProcessButtons = true; 
-        }
-        else if ((isStatusPayment || isStatusCompleted) && isGeneralAffairs) {
-            allowEditFields = false;
-            showProcessButtons = true; 
-        }
-
-        // 4. 画面制御実行
-        if (allowEditFields) {
-            $('#' + LOCK_STYLE_ID).remove();
-            
-            var $targetBtn = $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]');
-            if ($targetBtn.length > 0) {
-                $targetBtn.show();
-                $targetBtn.contents().filter(function() { return this.nodeType === 3; }).replaceWith(' 交通費情報を入力するにはこちらをクリック');
-                $targetBtn.css({ 'background-color': '#0056b3', 'background-image': 'none', 'border-color': '#004494', 'color': '#ffffff', 'font-weight': 'bold', 'padding': '5px 15px' });
-            }
-            initInputSupportUI($targetBtn);
-
-        } else {
-            // ★見た目は維持したままロックする
-            const $fields = $('#FieldSetGeneral');
-            $fields.find('input, select, textarea').prop('readonly', true);
-            $fields.find('input, select, textarea, label').css({
-                'pointer-events': 'none',
-                'background-color': '#fff', // グレーではなく白
-                'color': 'inherit',         // 文字色もそのまま
-                'cursor': 'default'         // カーソルだけ矢印にする
-            });
-            // 日付ピッカーやクリアボタンは隠す（操作できないので）
-            $fields.find('.ui-datepicker-trigger, .ui-icon-close').hide();
-        }
-
-        if (showProcessButtons) {
-            $('#MainCommands button').show();
-            if (!allowEditFields) {
-                $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]').hide();
-            }
-        }
-
-        $('#BtnPrintPdfParent').show();
-
-    })();
-    //#endregion
-
-    //#region<UI構築関数群 (OCR・履歴パネル)>
+    // ★重要：ここに関数を移動しました（メイン処理より前で定義する）
     const initInputSupportUI = ($targetBtn) => {
         if ($targetBtn.length === 0) return;
 
@@ -480,14 +364,124 @@ $p.events.on_editor_load = function () {
     };
     //#endregion
 
+    //#region<メイン処理：アクセス制御とUI構築>
+    (async () => {
+        // ---------------------------------------------------------------
+        // 1. 情報取得（キャッシュ対応版）
+        // ---------------------------------------------------------------
+        const currentUserId = String($p.userId()); // ログインユーザーID
+        let myDept = '';
+
+        const SESSION_KEY_MY_DEPT = 'TrafficApp_MyDept_' + currentUserId;
+        const cachedDept = sessionStorage.getItem(SESSION_KEY_MY_DEPT);
+
+        if (cachedDept) {
+            myDept = cachedDept;
+            console.log("DEBUG: Load Dept from Cache: " + myDept);
+        } else {
+            try {
+                const result = await apiGetAsync({
+                    id: WORKERTABLE_ID,
+                    data: { 
+                        View: { 
+                            ColumnFilterHash: { [WORKERTABLE_CLASS_USER]: JSON.stringify([currentUserId]) } 
+                        } 
+                    }
+                });
+                if (result.Response.Data.length > 0) {
+                    myDept = result.Response.Data[0][WORKERTABLE_CLASS_DEPT];
+                    sessionStorage.setItem(SESSION_KEY_MY_DEPT, myDept);
+                    console.log("DEBUG: Fetch Dept from API & Saved: " + myDept);
+                }
+            } catch (e) {
+                console.error("部署情報の取得に失敗", e);
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // 2. 権限判定
+        // ---------------------------------------------------------------
+        const applicantId = String($p.getControl(CLASS_USER).val() || ''); 
+        const creatorId   = String($p.getControl(CLASS_CREATOR).val() || '');
+        const superiorId  = String($p.getControl(CLASS_SUPERIOR).val() || '');
+
+        // ロール判定
+        const isApplicant = (currentUserId === applicantId) || (currentUserId === creatorId);
+        const isSuperior = (superiorId !== '' && currentUserId === superiorId);
+        const isGeneralAffairs = (myDept === GA_DEPT_NAME);
+
+        // ステータス判定
+        const st = $p.getControl('Status').text(); 
+        const isStatusEdit = (st === STATUS_CREATING || st === STATUS_REJECT); 
+        const isStatusApproval = (st === STATUS_APPROVAL); 
+        const isStatusPayment = (st === STATUS_UNDERREV); 
+        const isStatusCompleted = (st === STATUS_COMPLETED); 
+
+        console.log(`=== Access Control (User ID Mode) ===`);
+        console.log(`Me: ${currentUserId}, Dept: "${myDept}"`);
+        console.log(`Target -> App: "${applicantId}", Sup: "${superiorId}"`);
+        console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isGeneralAffairs}`);
+        console.log(`=====================================`);
+
+        // 3. 権限付与ロジック
+        let allowEditFields = false; 
+        let showProcessButtons = false; 
+
+        if (isStatusEdit && isApplicant) {
+            allowEditFields = true;
+            showProcessButtons = true;
+        }
+        else if (isStatusApproval && isSuperior) {
+            allowEditFields = false;
+            showProcessButtons = true; 
+        }
+        else if ((isStatusPayment || isStatusCompleted) && isGeneralAffairs) {
+            allowEditFields = false;
+            showProcessButtons = true; 
+        }
+
+        // 4. 画面制御実行
+        if (allowEditFields) {
+            $('#' + LOCK_STYLE_ID).remove();
+            
+            var $targetBtn = $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]');
+            if ($targetBtn.length > 0) {
+                $targetBtn.show();
+                $targetBtn.contents().filter(function() { return this.nodeType === 3; }).replaceWith(' 交通費情報を入力するにはこちらをクリック');
+                $targetBtn.css({ 'background-color': '#0056b3', 'background-image': 'none', 'border-color': '#004494', 'color': '#ffffff', 'font-weight': 'bold', 'padding': '5px 15px' });
+            }
+            initInputSupportUI($targetBtn);
+
+        } else {
+            // ★見た目は維持したままロックする
+            const $fields = $('#FieldSetGeneral');
+            $fields.find('input, select, textarea').prop('readonly', true);
+            $fields.find('input, select, textarea, label').css({
+                'pointer-events': 'none',
+                'background-color': '#fff', // グレーではなく白
+                'color': 'inherit',         // 文字色もそのまま
+                'cursor': 'default'         // カーソルだけ矢印にする
+            });
+            $fields.find('.ui-datepicker-trigger, .ui-icon-close').hide();
+        }
+
+        if (showProcessButtons) {
+            $('#MainCommands button').show();
+            if (!allowEditFields) {
+                $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]').hide();
+            }
+        }
+
+        $('#BtnPrintPdfParent').show();
+
+    })();
+    //#endregion
+
     //#region<自動入力系（修正済み）>
-    
-    // 作成者自動入力 (User IDセット) コピー作成時とかに使ってみるか？
     if($p.getControl(CLASS_CREATOR).val() === ''){
         $p.set($p.getControl(CLASS_CREATOR), $p.userId());
     }
 
-    // 承認日・承認者自動入力 (通信なしでOK!)
     if(currentStatus === STATUS_UNDERREV && $p.getControl(CLASS_MANFIXDATE).val() === ''){
         const today = new Date();
         $p.set($p.getControl(CLASS_MANFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
@@ -554,5 +548,4 @@ $p.events.on_editor_load = function () {
         } catch (e) { console.error(e); alert('エラーが発生しました。'); }
     });
     //#endregion
-    
 };

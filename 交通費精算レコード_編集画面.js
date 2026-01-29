@@ -29,6 +29,10 @@ $p.events.on_editor_load = function () {
     //-------------------------------------------------------------------------------------
     const TRANSREPOTABLE_ID = 15466053; //従業員一覧　テーブルID
     const COL_LINK_TRANSREPO = 'ClassI'; // 親（精算書）と紐付くリンク項目
+    const TRANSREPOTABLE_CLASS_CREATOR = 'ClassD'; //「作成者」欄
+    const TRANSREPOTABLE_ID_CREATE = 100;  //状況: 作成中のID
+    const TRANSREPOTABLE_ID_REJECT = 910;  //状況: 差し戻しのID
+    //-------------------------------------------------------------------------------------
 
     // 【重要】コピーしたい項目と、親から引き継ぎたい項目の定義
     const FIELDS = [
@@ -350,6 +354,55 @@ $p.events.on_editor_load = function () {
 
     //=====================================================================================================================================================
     //関数定義はここまで
+    //#endregion
+
+    //#region<親ステータスチェック（直接URLアクセス対策・修正版）>
+    // =========================================================================
+    // ▼ 親レコードのステータス(ID)を確認し、編集不可なら画面をロックする
+    // =========================================================================
+    (async () => {
+        try {
+            // 親IDを取得
+            const parentId = getParentId();
+            if (!parentId) return;
+
+            // 親レコードの情報を取得
+            const result = await apiGetAsync({
+                id: parentId
+            });
+
+            if (result.Response.Data.length > 0) {
+                const parentRecord = result.Response.Data[0];
+                // API経由だとステータスは「ID(数値)」で返ってきます (例: 100)
+                const pStatusId = parentRecord.Status; 
+
+                // 許可するステータスID
+                const ALLOWED_STATUS_IDS = [TRANSREPOTABLE_ID_CREATE, TRANSREPOTABLE_ID_REJECT];
+
+                if (!ALLOWED_STATUS_IDS.includes(pStatusId) || String(parentRecord[TRANSREPOTABLE_CLASS_CREATOR]) !== String($p.userId())) {
+                    console.log("Block Edit: Parent status ID is " + pStatusId);
+                    
+                    // アラート表示
+                    alert(`親レコードのステータス(ID:${pStatusId})が編集可能な状態ではないため、\nこの明細の作成・編集・削除はできません。`);
+
+                    // 画面ロック処理
+                    $('#MainCommands').empty(); 
+                    $('#MainCommands').append('<button id="GoBackBlocked" class="button button-icon ui-button ui-corner-all ui-widget">戻る</button>');
+                    $('#GoBackBlocked').on('click', function(e){
+                        e.preventDefault();
+                        window.location.href = '/fs/Items/' + parentId;
+                    });
+
+                    $('input, select, textarea, button').prop('disabled', true);
+                    $('.ui-datepicker-trigger').hide(); 
+                    $('#MyCalcButton, #BtnRegistFav, #BtnOcrRead').remove();
+                    $('#CustomRouteContainer').hide(); 
+                }
+            }
+        } catch (e) {
+            console.error("親ステータスチェックに失敗", e);
+        }
+    })();
     //#endregion
 
     //#region<交通費精算書から自動で情報入力>
