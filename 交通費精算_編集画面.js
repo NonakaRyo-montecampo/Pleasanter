@@ -19,6 +19,23 @@ $p.events.on_editor_load = function () {
     const CHILD_TABLE_ID = 15339887;   
     const LINK_COLUMN_NAME = 'ClassI'; 
     const PARENT_USER_COLUMN = 'ClassA'; 
+    
+    //ログインユーザーの権限判定用
+    //------------------------------------------------------------------------------
+    // 現在のユーザーIDなどは同期的に取れるのでここで確定してOK
+    const currentUserId = String($p.userId()); 
+    /*
+    const applicantId = String($p.getControl(CLASS_USER).val() || ''); 
+    const creatorId   = String($p.getControl(CLASS_CREATOR).val() || '');
+    const superiorId  = String($p.getControl(CLASS_SUPERIOR).val() || '');
+    // 同期的に判定できるものはここで計算
+    let myDept = '';
+    let isApplicant = isApplicant = (currentUserId === applicantId) || (currentUserId === creatorId);
+    let isSuperior = (superiorId !== '' && currentUserId === superiorId);
+    let isGeneralAffairs = false;
+    */
+    //------------------------------------------------------------------------------
+    
 
     // ステータスID定義
     const STATUS_CREATING = '作成中'; 
@@ -27,6 +44,8 @@ $p.events.on_editor_load = function () {
     const STATUS_UNDERREV = '決済待ち';
     const STATUS_COMPLETED = '完了'; 
 
+    //「交通費精算レコード」テーブル
+    const TRAFREC_CLASS_DATANO = 'NumB'; //「清算書内データNo」欄
     const FIELD_MAP = {
         date:        'StartTime',
         destination: 'Title',
@@ -72,26 +91,6 @@ $p.events.on_editor_load = function () {
     const currentStatus = $p.getControl('Status').text();
     //#endregion
 
-    //#region <初期表示時のチラつき防止対策>
-    const LOCK_STYLE_ID = 'temp-child-lock-style';
-    const lockCss = `
-        <style id="${LOCK_STYLE_ID}">
-            /* 子テーブル操作無効化 */
-            table[data-id="${CHILD_TABLE_ID}"] tbody tr { pointer-events: none !important; }
-            table[data-id="${CHILD_TABLE_ID}"] tbody a { 
-                pointer-events: none !important; 
-                cursor: default !important; 
-                text-decoration: none !important; 
-                color: inherit !important; 
-            }
-            #MainCommands button { display: none; }
-            #MainCommands button#GoBack { display: inline-block; }
-            button[data-to-site-id="${CHILD_TABLE_ID}"] { display: none; }
-        </style>
-    `;
-    $('head').append(lockCss);
-    //#endregion
-
     //#region<関数定義>
     const apiGetAsync = (jsonfile) => {
         return new Promise((resolve, reject) => {
@@ -117,10 +116,53 @@ $p.events.on_editor_load = function () {
         return (date.getMonth() + 1) + '/' + date.getDate();
     }
 
-    // ★UI構築関数（メイン処理より前で定義）
+
+
+    //子レコードの並び順を現在の見た目通りに更新する共通関数
+    const updateChildOrder = async () => {
+        const $rows = $(`table[data-id="${CHILD_TABLE_ID}"] tbody tr`);
+        if ($rows.length === 0) return true; // 対象なしなら成功とみなす
+
+        let updatePromises = [];
+        let needUpdate = false;
+
+        $rows.each(function (index) {
+            const $row = $(this);
+            const recordId = $row.data('id'); 
+            if (!recordId) return;
+
+            const correctNo = index + 1;
+            // 無条件でUpdateリストに入れる
+            updatePromises.push(
+                apiUpdateAsync(recordId, { [TRAFREC_CLASS_DATANO]: correctNo })
+            );
+            needUpdate = true;
+        });
+
+        if (needUpdate) {
+            console.log("DEBUG: Updating child order...");
+            $('#MainContainer').css('opacity', '0.5'); // 処理中表示
+            try {
+                await Promise.all(updatePromises);
+                console.log("DEBUG: Child order updated.");
+                return true;
+            } catch (e) {
+                console.error("並び替え更新エラー", e);
+                alert("明細の並び順更新に失敗しました。");
+                return false;
+            } finally {
+                $('#MainContainer').css('opacity', '1.0');
+            }
+        }
+        return true;
+    };
+    //#endregion
+
+    //#region<UI構築関数>
     const initInputSupportUI = ($targetBtn) => {
         if ($targetBtn.length === 0) return;
 
+        //#region<<経路選択パネル>>
         // --- 1. 経路選択パネル ---
         if ($('#CustomRouteContainer').length === 0) {
             let cachedFavRecords = null;
@@ -149,7 +191,7 @@ $p.events.on_editor_load = function () {
             // 履歴データ読込 (User IDを使用)
             const loadHistoryData = async () => {
                 const $histContainer = $('#tab-history');
-                const currentUserId = $p.userId();
+                //const currentUserId = $p.userId();
                 const SESSION_KEY_HIST = 'TrafficApp_History';
                 let historyList = [];
                 const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
@@ -288,7 +330,9 @@ $p.events.on_editor_load = function () {
                 window.location.href = '/fs/Items/' + CHILD_TABLE_ID + '/New?' + LINK_COLUMN_NAME + '=' + data.ParentId;
             });
         }
+        //#endregion
 
+        //#region<<OCRボタン>>
         // --- 2. OCRボタン ---
         if ($('#BtnOcrRead').length === 0) {
             const ocrBtnHtml = `<button id="BtnOcrRead" class="button button-icon ui-button ui-corner-all ui-widget" style="margin-left: 10px;"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-image"></span>画像から交通費情報を読取(OCR)</button><input type="file" id="OcrFileInput" accept="image/png, image/jpeg" style="display:none;">`;
@@ -361,15 +405,17 @@ $p.events.on_editor_load = function () {
                 window.location.href = '/fs/Items/' + CHILD_TABLE_ID + '/New?' + (typeof LINK_COLUMN_NAME !== 'undefined' ? LINK_COLUMN_NAME : 'ClassI') + '=' + parentId;
             };
         }
+        //#endregion
     };
     //#endregion
 
     //#region<メイン処理：アクセス制御とUI構築>
     (async () => {
+        //#region<<権限確認>>
         // ---------------------------------------------------------------
         // 1. 情報取得（キャッシュ対応版）
         // ---------------------------------------------------------------
-        const currentUserId = String($p.userId()); // ログインユーザーID
+        //const currentUserId = String($p.userId()); // ログインユーザーID
         let myDept = '';
 
         const SESSION_KEY_MY_DEPT = 'TrafficApp_MyDept_' + currentUserId;
@@ -398,20 +444,25 @@ $p.events.on_editor_load = function () {
             }
         }
 
+        // ★ここで共有変数を更新 (asyncの結果を反映)
+        //isGeneralAffairs = (myDept === GA_DEPT_NAME);
+
         // ---------------------------------------------------------------
         // 2. 権限判定
         // ---------------------------------------------------------------
+
         const applicantId = String($p.getControl(CLASS_USER).val() || ''); 
         const creatorId   = String($p.getControl(CLASS_CREATOR).val() || '');
         const superiorId  = String($p.getControl(CLASS_SUPERIOR).val() || '');
-
+        
         const isApplicant = (currentUserId === applicantId) || (currentUserId === creatorId);
         const isSuperior = (superiorId !== '' && currentUserId === superiorId);
         const isGeneralAffairs = (myDept === GA_DEPT_NAME);
-
+        
+        //ステータスチェック
         const st = $p.getControl('Status').text(); 
-        const isStatusEdit = (st === STATUS_CREATING || st === STATUS_REJECT); 
-        const isStatusApproval = (st === STATUS_APPROVAL); 
+        const isStatusEdit = (st === STATUS_CREATING || st === STATUS_REJECT);
+        const isStatusApproval = (st === STATUS_APPROVAL);
         const isStatusPayment = (st === STATUS_UNDERREV); 
         const isStatusCompleted = (st === STATUS_COMPLETED); 
 
@@ -437,10 +488,13 @@ $p.events.on_editor_load = function () {
             allowEditFields = false;
             showProcessButtons = true; 
         }
+        console.log('allowEditField: ' + allowEditFields + ', showProcessButtons: ' + showProcessButtons);
+        //#endregion
 
+        //#region<<権限毎の画面制御>>
         // 4. 画面制御実行
         if (allowEditFields) {
-            $('#' + LOCK_STYLE_ID).remove();
+            //$('#' + LOCK_STYLE_ID).remove();
             
             var $targetBtn = $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]');
             if ($targetBtn.length > 0) {
@@ -451,6 +505,8 @@ $p.events.on_editor_load = function () {
             initInputSupportUI($targetBtn);
 
         } else {
+            $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]').hide();
+
             const $fields = $('#FieldSetGeneral');
             $fields.find('input, select, textarea').prop('readonly', true);
             $fields.find('input, select, textarea, label').css({
@@ -460,15 +516,32 @@ $p.events.on_editor_load = function () {
                 'cursor': 'default'         
             });
             $fields.find('.ui-datepicker-trigger, .ui-icon-close').hide();
+        
+            $(`table[data-id="${CHILD_TABLE_ID}"] tbody`).on('click', 'tr', function(e) {
+                // 明示的に編集を禁止
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                return false;
+            });
+            // リンクも無効化
+            $(`table[data-id="${CHILD_TABLE_ID}"] tbody a`).on('click', function(e) {
+                e.preventDefault();
+                return false;
+            });
         }
 
+        /*
         if (showProcessButtons) {
             $('#MainCommands button').show();
-            if (!allowEditFields) {
-                $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]').hide();
-            }
         }
+        */
+        if (!showProcessButtons) {
+            $('#MainCommands button').hide();
+            $('#GoBack').show();
+        }
+        //#endregion
 
+        //#region<<PDFボタン>>
         // ★修正点：PDFボタンの追加・表示をここ（メイン処理の最後）に移動
         // 新規作成以外の場合にPDFボタンを追加する
         if($p.action() !== 'new'){
@@ -486,7 +559,7 @@ $p.events.on_editor_load = function () {
                     if (!confirm('以下の条件でPDFを出力しますか？\n\n・対象：紐付いている全明細\n・利用者：' + userName)) return;
 
                     try {
-                        const sortKey = (typeof SORT_COL_NAME !== 'undefined') ? SORT_COL_NAME : 'NumB';
+                        const sortKey = (typeof TRAFREC_CLASS_DATANO !== 'undefined') ? TRAFREC_CLASS_DATANO : 'NumB';
                         var result = await apiGetAsync({
                             id: CHILD_TABLE_ID,
                             data: { 
@@ -529,6 +602,7 @@ $p.events.on_editor_load = function () {
             // 確実に表示
             $('#BtnPrintPdfParent').show();
         }
+        //#endregion
 
     })();
     //#endregion
@@ -561,8 +635,7 @@ $p.events.on_editor_load = function () {
     // ▼ 子テーブルの行をドラッグ＆ドロップで並び替え可能にし、
     //    保存時に「見た目の順番通り」に番号を振り直す処理
     // =========================================================================
-    
-    const SORT_COL_NAME = 'NumB'; 
+
 
     // 1. 並び替えUIの有効化
     const setupSortableChildTable = () => {
@@ -610,58 +683,35 @@ $p.events.on_editor_load = function () {
         // --- 判定ロジック ---
 
         if ($sender && ($sender.attr('id') === 'DeleteCommand' || $sender.attr('name') === 'Delete')) {
-            console.log("DEBUG: Skip sort update (Delete button).");
+            //console.log("DEBUG: Skip sort update (Delete button).");
             return true;
         }
 
         if (isChildUpdating) {
-            console.log("DEBUG: Proceed to save (isChildUpdating = true).");
+            //console.log("DEBUG: Proceed to save (isChildUpdating = true).");
             return true;
         }
 
+        /*
         if ($('#FieldSetGeneral').find('input').prop('readonly')) {
             return true;
         }
+        */
 
         // 4. 並び順の更新処理を開始
         (async () => {
             try {
-                const $rows = $(`table[data-id="${CHILD_TABLE_ID}"] tbody tr`);
-                
-                if ($rows.length === 0) {
-                    isChildUpdating = true;
-                    $sender.trigger('click');
-                    return;
-                }
+                console.log("DEBUG: Start to save record update.");
+                // 共通関数を使って更新
+                await updateChildOrder();
 
-                let updatePromises = [];
-                let needUpdate = false; 
-                
-                $rows.each(function (index) {
-                    const $row = $(this);
-                    const recordId = $row.data('id'); 
-                    if (!recordId) return;
-
-                    const correctNo = index + 1;
-                    updatePromises.push(
-                        apiUpdateAsync(recordId, { [SORT_COL_NAME]: correctNo })
-                    );
-                    needUpdate = true;
-                });
-
-                if (needUpdate) {
-                    $('#MainContainer').css('opacity', '0.5');
-                    await Promise.all(updatePromises);
-                    console.log("DEBUG: All child records updated.");
-                }
-
+                // 5. 更新完了後、再クリック
                 isChildUpdating = true;
-                console.log("DEBUG: Triggering original click on #" + $sender.attr('id'));
                 $sender.trigger('click');
 
             } catch (e) {
                 console.error("並び替え更新エラー", e);
-                alert("明細の並び順更新に失敗しました。\n(保存処理は中断されます)");
+                // エラー時はロック解除
                 $('#MainContainer').css('opacity', '1');
             }
         })();
@@ -671,6 +721,5 @@ $p.events.on_editor_load = function () {
 
     setupSortableChildTable();
     //#endregion
-    
-    // ※ここに以前あった「精算書PDF出力」ブロックは削除済み（上に統合）
+
 };
