@@ -1,4 +1,4 @@
-// 交通費申請　編集画面（ユーザーID移行・見やすさ改善・PDFボタン修正版）
+// 交通費申請　編集画面
 $p.events.on_editor_load = function () {
 
     //#region<定数定義>
@@ -66,6 +66,15 @@ $p.events.on_editor_load = function () {
     // 「お気に入り経路」テーブル
     const FAV_TABLE_ID = 15951290;
     const FAV_USER_COL = 'ClassD'; 
+    const FAV_FIELD_MAP = {
+        title:       'Title',
+        destination: 'ClassE',
+        dep:         'ClassA',
+        arr:         'ClassB',
+        way:         'ClassC',
+        amount:      'NumA',
+        memo:        'Body'
+    };
 
     //「経路履歴」テーブル
     const HIST_TABLE_ID = 15960204;
@@ -261,13 +270,40 @@ $p.events.on_editor_load = function () {
                 const startIndex = (page - 1) * limit;
                 const displayRecords = cachedFavRecords.slice(startIndex, startIndex + limit);
 
-                let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="padding:5px;">名称</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="width:30px; padding:5px;"></th></tr></thead><tbody>';
+                let tableHtml = 
+                '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="padding:5px;">名称</th><th style="padding:5px;">行先</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="width:30px; padding:5px;"></th></tr></thead><tbody>';
+
                 displayRecords.forEach(r => {
                     const recordId = r.IssueId || r.ResultId || r.Id;
                     const routeDesc = (r.ClassA || '') + ' → ' + (r.ClassB || '') + ' <span style="color:#666;">(' + (r.ClassC || '-') + ')</span>';
-                    const copyData = { Title: r.Title, ClassA: r.ClassA, ClassB: r.ClassB, ClassD: r.ClassC, NumC: r.NumA, Body: r.Body, ClassE: $p.getControl(CLASS_USER).val(), ClassC: $p.getControl(CLASS_SUPERIOR).val(), ClassI: String($p.id()), _mode: 'copy' };
+                    const copyData = { 
+                        Title: r[FAV_FIELD_MAP.destination], 
+                        ClassA: r.ClassA, 
+                        ClassB: r.ClassB, 
+                        ClassD: r.ClassC, 
+                        NumC: r.NumA, 
+                        Body: r.Body, 
+                        ClassE: $p.getControl(CLASS_USER).val(), 
+                        ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
+                        ClassI: String($p.id()), 
+                        _mode: 'copy' 
+                    };
                     const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
-                    tableHtml += `<tr style="border-bottom:1px solid #eee;"><td style="text-align:center; padding: 5px;"><button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px; white-space: nowrap;" data-json="${jsonStr}">選択</button></td><td style="padding: 5px;">${r.Title}</td><td style="padding: 5px;">${routeDesc}</td><td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()  + "円"}</td><td style="text-align:center; padding: 5px;"><button type="button" class="delete-fav-btn ui-button ui-corner-all ui-widget" style="padding: 1px 6px; font-size: 11px; color: white; background-color: #d9534f; border: 1px solid #d43f3a; border-radius: 3px;" title="削除" data-id="${recordId}" data-page="${page}">×</button></td></tr>`;
+                    tableHtml += 
+                    `<tr style="border-bottom:1px solid #eee;">
+                        <td style="text-align:center; padding: 5px;">
+                            <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" 
+                            style="padding:2px 8px; font-size:11px; white-space: nowrap;" data-json="${jsonStr}">選択</button>
+                        </td>
+                        <td style="padding: 5px;">${r.Title}</td>
+                        <td style="padding: 5px;">${r.ClassE}</td>
+                        <td style="padding: 5px;">${routeDesc}</td>
+                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()  + "円"}</td>
+                        <td style="text-align:center; padding: 5px;">
+                            <button type="button" class="delete-fav-btn ui-button ui-corner-all ui-widget" style="padding: 1px 6px; font-size: 11px; color: white; 
+                            background-color: #d9534f; border: 1px solid #d43f3a; border-radius: 3px;" title="削除" data-id="${recordId}" data-page="${page}">×</button>
+                        </td>
+                    </tr>`;
                 });
                 tableHtml += '</tbody></table>';
                 

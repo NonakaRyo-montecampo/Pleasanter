@@ -12,6 +12,7 @@ $p.events.on_editor_load = function () {
     //#region<定数定義>
     //=====================================================================================================================================================
     const gasUrl = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec'; // ★あなたのGASのURL
+    const CLASS_DESTINATION = 'Title';//「行先」欄
     const CLASS_DEP = 'ClassA'; //「出発駅」欄
     const CLASS_ARR = 'ClassB'; //「到着駅」欄
     const CLASS_TRAFFWAY = 'ClassD'; //「交通手段」欄
@@ -56,12 +57,13 @@ $p.events.on_editor_load = function () {
     const FAV_TABLE_ID = 15951290;  //お気に入り経路テーブルID
     //お気に入りテーブル側の項目定義（Dictionary的な使い方）
     const FAV_FIELDS = {
-        DEP:   'ClassA', // 出発
-        ARR:   'ClassB', // 到着
-        WAY:   'ClassC', // 交通手段 (お気に入り側)
-        USER:  'ClassD', // 登録ユーザー (お気に入り側)
-        COST:  'NumA',   // 金額(片道)
-        MEMO:  'Body'    // 備考
+        DES:    'ClassE',    //目的
+        DEP:    'ClassA',   // 出発
+        ARR:    'ClassB',   // 到着
+        WAY:    'ClassC',   // 交通手段 (お気に入り側)
+        USER:   'ClassD',   // 登録ユーザー (お気に入り側)
+        COST:   'NumA',     // 金額(片道)
+        MEMO:   'Body'      // 備考
     };
 
     //-------------------------------------------------------------------------------------
@@ -864,6 +866,7 @@ $p.events.on_editor_load = function () {
             Title: routeName, // タイトルは定数化せずそのままでOK
             ClassHash: {
                 // ★ブラケット記法 [] を使うことで、定数の値をキーとして展開できます
+                [FAV_FIELDS.DES]:  $p.getControl(CLASS_DESTINATION).val(), // 行先 
                 [FAV_FIELDS.DEP]:  $p.getControl(CLASS_DEP).val(), // 出発
                 [FAV_FIELDS.ARR]:  $p.getControl(CLASS_ARR).val(), // 到着
                 [FAV_FIELDS.WAY]:  $p.getControl(CLASS_TRAFFWAY).val(),  // 交通手段 (子はClassD)
