@@ -65,7 +65,6 @@ $p.events.on_editor_load = function () {
         COST:   'NumA',     // 金額(片道)
         MEMO:   'Body'      // 備考
     };
-
     //-------------------------------------------------------------------------------------
     
     //以下「経路履歴」テーブル情報
@@ -74,6 +73,16 @@ $p.events.on_editor_load = function () {
     const SESSION_KEY_HIST = 'TrafficApp_History';
     const HIST_USER_COL = 'ClassD'; // お気に入りマスタのユーザーID項目
     const HIST_REGISTQTY = 5; //経路履歴最大保存件数
+
+    const HIST_FIELDS = {
+        DES:    'Title',    //目的
+        DEP:    'ClassA',   // 出発
+        ARR:    'ClassB',   // 到着
+        WAY:    'ClassC',   // 交通手段
+        USER:   'ClassD',   // 登録ユーザー
+        COST:   'NumA',     // 金額(片道)
+        MEMO:   'Body'      // 備考
+    };
     //-------------------------------------------------------------------------------------
 
     // 読み取り専用化
@@ -407,11 +416,11 @@ $p.events.on_editor_load = function () {
     })();
     //#endregion
 
-    //#region<交通費精算書から自動で情報入力>
+    //#region<親レコードから自動で情報入力>
     // =========================================================================
     // 1. 画面ロード時の処理（データの自動入力）
     // =========================================================================
-    console.log('現在は: ' + $p.action());
+    //console.log('現在は: ' + $p.action());
     if ($p.action() === 'new' || $p.action() === 'New'){
         
         (async () => {

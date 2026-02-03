@@ -53,7 +53,7 @@ $p.events.on_editor_load = function () {
         arr:         'ClassB',
         way:         'ClassD',
         trip:        'ClassH',
-        amount:      'NumA',
+        amount:      'NumC',
         memo:        'Body',
         approvedDate: 'DateB'
     };
@@ -66,6 +66,7 @@ $p.events.on_editor_load = function () {
     // 「お気に入り経路」テーブル
     const FAV_TABLE_ID = 15951290;
     const FAV_USER_COL = 'ClassD'; 
+    const FAV_CLASS_NAME = 'Title';
     const FAV_FIELD_MAP = {
         title:       'Title',
         destination: 'ClassE',
@@ -79,9 +80,18 @@ $p.events.on_editor_load = function () {
     //「経路履歴」テーブル
     const HIST_TABLE_ID = 15960204;
     const HIST_USER_COL = 'ClassD'; 
+    const HIST_REGISTDATE = 'DateA';
+    const HIST_MEMO = 'Body';
     const HIST_REGISTQTY = 5; 
 
     const PAGE_SIZE = 5; 
+    const HIST_FIELD_MAP = {
+        destination: 'Title',
+        dep:         'ClassA',
+        arr:         'ClassB',
+        way:         'ClassC',
+        amount:      'NumA'
+    };
 
     // =========================================================================
     // 指定項目読み取り専用化
@@ -239,18 +249,36 @@ $p.events.on_editor_load = function () {
                 if (historyList.length === 0) {
                     $histContainer.html('<p style="color:#666; margin:10px;">履歴はありません。</p>');
                 } else {
-                    let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px;"></th><th>日付</th><th>経路</th><th>金額</th><th>備考</th></tr></thead><tbody>';
+                    let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px;"></th><th>日付</th><th>行先</th><th>経路</th><th>金額</th><th>備考</th></tr></thead><tbody>';
                     const limit = 5;
                     historyList.slice(0, limit).forEach(r => {
-                        const routeDesc = (r.ClassA || '') + ' → ' + (r.ClassB || '') + ' <span style="color:#666;">(' + (r.ClassC || '-') + ')</span>'; 
+                        const routeDesc = (r[HIST_FIELD_MAP.dep] || '') + ' → ' + (r[HIST_FIELD_MAP.arr] || '') + ' <span style="color:#666;">(' + (r[HIST_FIELD_MAP.way] || '-') + ')</span>'; 
                         const copyData = {
-                            ClassA: r.ClassA, ClassB: r.ClassB, ClassD: r.ClassC, NumC: r.NumA, 
-                            ClassE: $p.getControl(CLASS_USER).val(), ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
-                            ClassI: String($p.id()), _mode: 'copy'
+                            [FIELD_MAP.destination]: r[HIST_FIELD_MAP.destination], 
+                            [FIELD_MAP.dep]: r[HIST_FIELD_MAP.dep], 
+                            [FIELD_MAP.arr]: r[HIST_FIELD_MAP.arr], 
+                            [FIELD_MAP.way]: r[HIST_FIELD_MAP.way], 
+                            [FIELD_MAP.amount]: r[HIST_FIELD_MAP.amount], 
+                            //以下子レコード内保存領域を持たないデータのため削除
+                            //ClassE: $p.getControl(CLASS_USER).val(), 
+                            //ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
+                            //ClassI: String($p.id()),
+                            _mode: 'copy'
                         };
                         const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
-                        let dateStr = r.DateA ? new Date(r.DateA).toLocaleDateString() : '-';
-                        tableHtml += `<tr style="border-bottom:1px solid #eee;"><td style="text-align:center; padding: 5px;"><button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px; white-space: nowrap;" data-json="${jsonStr}">選択</button></td><td style="padding: 5px;">${dateStr}</td><td style="padding: 5px;">${routeDesc}</td><td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString() + "円"}</td><td style="padding: 5px;">${r.Body || ''}</td></tr>`;
+                        let dateStr = r[HIST_REGISTDATE] ? new Date(r[HIST_REGISTDATE]).toLocaleDateString() : '-';
+                        tableHtml += 
+                        `<tr style="border-bottom:1px solid #eee;">
+                            <td style="text-align:center; padding: 5px;">
+                                <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px; white-space: nowrap;" 
+                                data-json="${jsonStr}">選択</button>
+                            </td>
+                            <td style="padding: 5px;">${dateStr}</td>
+                            <td style="padding: 5px;">${r[HIST_FIELD_MAP.destination]}</td>
+                            <td style="padding: 5px;">${routeDesc}</td>
+                            <td style="text-align:right; padding: 5px;">${(r[HIST_FIELD_MAP.amount] || 0).toLocaleString() + "円"}</td>
+                            <td style="padding: 5px;">${r[HIST_MEMO] || ''}</td>
+                        </tr>`;
                     });
                     tableHtml += '</tbody></table>';
                     $histContainer.html(tableHtml);
@@ -275,17 +303,19 @@ $p.events.on_editor_load = function () {
 
                 displayRecords.forEach(r => {
                     const recordId = r.IssueId || r.ResultId || r.Id;
-                    const routeDesc = (r.ClassA || '') + ' → ' + (r.ClassB || '') + ' <span style="color:#666;">(' + (r.ClassC || '-') + ')</span>';
+                    const routeDesc = (r[FAV_FIELD_MAP.dep] || '') + ' → ' + (r[FAV_FIELD_MAP.arr] || '') + ' <span style="color:#666;">(' + (r[FAV_FIELD_MAP.way] || '-') + ')</span>';
+                    //子レコードへのコピー用データ作成(お気に入り経路欄→子レコード欄への変換)
                     const copyData = { 
-                        Title: r[FAV_FIELD_MAP.destination], 
-                        ClassA: r.ClassA, 
-                        ClassB: r.ClassB, 
-                        ClassD: r.ClassC, 
-                        NumC: r.NumA, 
-                        Body: r.Body, 
-                        ClassE: $p.getControl(CLASS_USER).val(), 
-                        ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
-                        ClassI: String($p.id()), 
+                        [FIELD_MAP.destination] : r[FAV_FIELD_MAP.destination], 
+                        [FIELD_MAP.dep]: r[FAV_FIELD_MAP.dep], 
+                        [FIELD_MAP.arr]: r[FAV_FIELD_MAP.arr], 
+                        [FIELD_MAP.way]: r[FAV_FIELD_MAP.way], 
+                        [FIELD_MAP.amount]: r[FAV_FIELD_MAP.amount], 
+                        [FIELD_MAP.memo]: r[FAV_FIELD_MAP.memo], 
+                        //以下子レコード内保存領域を持たないデータのため削除
+                        //ClassE: $p.getControl(CLASS_USER).val(), 
+                        //ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
+                        //ClassI: String($p.id()), 
                         _mode: 'copy' 
                     };
                     const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
@@ -295,10 +325,10 @@ $p.events.on_editor_load = function () {
                             <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" 
                             style="padding:2px 8px; font-size:11px; white-space: nowrap;" data-json="${jsonStr}">選択</button>
                         </td>
-                        <td style="padding: 5px;">${r.Title}</td>
-                        <td style="padding: 5px;">${r.ClassE}</td>
+                        <td style="padding: 5px;">${r[FAV_CLASS_NAME]}</td>
+                        <td style="padding: 5px;">${r[FAV_FIELD_MAP.destination]}</td>
                         <td style="padding: 5px;">${routeDesc}</td>
-                        <td style="text-align:right; padding: 5px;">${(r.NumA || 0).toLocaleString()  + "円"}</td>
+                        <td style="text-align:right; padding: 5px;">${(r[FAV_FIELD_MAP.amount] || 0).toLocaleString()  + "円"}</td>
                         <td style="text-align:center; padding: 5px;">
                             <button type="button" class="delete-fav-btn ui-button ui-corner-all ui-widget" style="padding: 1px 6px; font-size: 11px; color: white; 
                             background-color: #d9534f; border: 1px solid #d43f3a; border-radius: 3px;" title="削除" data-id="${recordId}" data-page="${page}">×</button>
@@ -642,7 +672,7 @@ $p.events.on_editor_load = function () {
     })();
     //#endregion
 
-    //#region<自動入力系（修正済み）>
+    //#region<自動入力系>
     if($p.getControl(CLASS_CREATOR).val() === ''){
         $p.set($p.getControl(CLASS_CREATOR), $p.userId());
     }
