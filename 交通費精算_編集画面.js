@@ -542,9 +542,8 @@ $p.events.on_editor_load = function () {
         //#endregion
 
         //#region<<PDFボタン>>
-        // ★修正点：PDFボタンの追加・表示をここ（メイン処理の最後）に移動
-        // 新規作成以外の場合にPDFボタンを追加する
-        if($p.action() !== 'new'){
+        // 新規作成以外且つ総務部の場合にPDFボタンを追加する
+        if($p.action() !== 'new' && isGeneralAffairs){
             // 一度ボタンがあるか確認して、なければ追加（二重追加防止）
             if ($('#BtnPrintPdfParent').length === 0) {
                 $('#MainCommands').append('<button id="BtnPrintPdfParent" class="button button-icon ui-button ui-corner-all ui-widget"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-document"></span>PDF出力</button>');
