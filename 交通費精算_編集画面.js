@@ -2,6 +2,10 @@
 $p.events.on_editor_load = function () {
 
     //#region<定数定義>
+    
+    //ログインユーザID
+    const currentUserId = String($p.userId()); 
+
     // =========================================================================
     // 【設定エリア】
     // =========================================================================
@@ -19,23 +23,6 @@ $p.events.on_editor_load = function () {
     const CHILD_TABLE_ID = 15339887;   
     const LINK_COLUMN_NAME = 'ClassI'; 
     const PARENT_USER_COLUMN = 'ClassA'; 
-    
-    //ログインユーザーの権限判定用
-    //------------------------------------------------------------------------------
-    // 現在のユーザーIDなどは同期的に取れるのでここで確定してOK
-    const currentUserId = String($p.userId()); 
-    /*
-    const applicantId = String($p.getControl(CLASS_USER).val() || ''); 
-    const creatorId   = String($p.getControl(CLASS_CREATOR).val() || '');
-    const superiorId  = String($p.getControl(CLASS_SUPERIOR).val() || '');
-    // 同期的に判定できるものはここで計算
-    let myDept = '';
-    let isApplicant = isApplicant = (currentUserId === applicantId) || (currentUserId === creatorId);
-    let isSuperior = (superiorId !== '' && currentUserId === superiorId);
-    let isGeneralAffairs = false;
-    */
-    //------------------------------------------------------------------------------
-    
 
     // ステータスID定義
     const STATUS_CREATING = '作成中'; 
@@ -82,7 +69,7 @@ $p.events.on_editor_load = function () {
     const HIST_USER_COL = 'ClassD'; 
     const HIST_REGISTDATE = 'DateA';
     const HIST_MEMO = 'Body';
-    const HIST_REGISTQTY = 5; 
+    const HIST_REGISTQTY = 5;
 
     const PAGE_SIZE = 5; 
     const HIST_FIELD_MAP = {
@@ -96,16 +83,24 @@ $p.events.on_editor_load = function () {
     // =========================================================================
     // 指定項目読み取り専用化
     const setReadOnlyStyle = (selector) => {
-        $p.getControl(selector).prop('readonly', true).css({
+        const $ctrl = $p.getControl(selector);
+        // 1. もし親が date-field (時計アイコン付きの箱) なら、箱から出す
+        const $dateFieldWrapper = $ctrl.closest('date-field');
+        if ($dateFieldWrapper.length > 0) {
+            // inputタグ(自分)を箱の直前に移動
+            $dateFieldWrapper.before($ctrl);
+            // 空になった箱(date-field)を削除 → これで時計アイコンも消える
+            $dateFieldWrapper.remove();
+        }
+        // 2. 入力欄自体のロック
+        $ctrl.prop('readonly', true).css({
             'pointer-events': 'none',
             'background-color': '#fff', 
             'cursor': 'default'
         });
+        // 3. 通常のアイコン（人アイコンなど）を隠す
+        $ctrl.siblings('.ui-icon-person').hide();
     };
-    setReadOnlyStyle(CLASS_MANFIXDATE);
-    setReadOnlyStyle(CLASS_GAFIXDATE);
-    setReadOnlyStyle(CLASS_GAID);
-    
     // 現在のステータス取得
     const currentStatus = $p.getControl('Status').text();
     //#endregion
@@ -558,10 +553,15 @@ $p.events.on_editor_load = function () {
         //#endregion
 
         //#region<<権限毎の画面制御>>
+        //デフォルトで読み取り専用の項目を読み取り専用化    
+        setReadOnlyStyle(CLASS_MANFIXDATE);
+        setReadOnlyStyle(CLASS_GAFIXDATE);
+        setReadOnlyStyle(CLASS_GAID);
+        //差し戻し時は申請日も読み取り専用化
+        if(currentStatus === STATUS_REJECT)setReadOnlyStyle(CLASS_REQUESTDATE);
+    
         // 4. 画面制御実行
         if (allowEditFields) {
-            //$('#' + LOCK_STYLE_ID).remove();
-            
             var $targetBtn = $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]');
             if ($targetBtn.length > 0) {
                 $targetBtn.show();
@@ -574,6 +574,42 @@ $p.events.on_editor_load = function () {
             $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]').hide();
 
             const $fields = $('#FieldSetGeneral');
+            /*
+            // 透明カーテン方式で日付を入力する項目の時計アイコンのクリック制御する場合
+            $fields.find('date-field').each(function() {
+                // 親要素（container-normal等）を取得
+                const $wrapper = $(this).parent();
+                
+                // 親要素を相対配置にする（カーテンの位置基準にするため）
+                $wrapper.css('position', 'relative');
+                
+                // 透明カーテンを作成して被せる
+                const $curtain = $('<div>').css({
+                    'position': 'absolute',
+                    'top': '0',
+                    'left': '0',
+                    'width': '100%',
+                    'height': '100%',
+                    'z-index': '9999',      // 最前面に表示
+                    'background-color': 'transparent', // 透明
+                    'cursor': 'default'     // カーソルを通常矢印に
+                });
+                
+                // カーテンを追加
+                $wrapper.append($curtain);
+            });
+            */
+           // ★追加: 画面内のすべての date-field (時計アイコンの箱) を破壊して中身だけにする
+            $fields.find('date-field').each(function() {
+                const $wrapper = $(this);
+                const $input = $wrapper.find('input');
+                // inputが見つかれば、箱の外に出して箱を消す
+                if ($input.length > 0) {
+                    $wrapper.before($input);
+                    $wrapper.remove();
+                }
+            });
+
             $fields.find('input, select, textarea').prop('readonly', true);
             $fields.find('input, select, textarea, label').css({
                 'pointer-events': 'none',
@@ -581,8 +617,8 @@ $p.events.on_editor_load = function () {
                 'color': 'inherit',         
                 'cursor': 'default'         
             });
-            $fields.find('.ui-datepicker-trigger, .ui-icon-close').hide();
-        
+            $fields.find('.ui-icon-person').hide();
+            
             $(`table[data-id="${CHILD_TABLE_ID}"] tbody`).on('click', 'tr', function(e) {
                 // 明示的に編集を禁止
                 e.preventDefault();
@@ -596,11 +632,6 @@ $p.events.on_editor_load = function () {
             });
         }
 
-        /*
-        if (showProcessButtons) {
-            $('#MainCommands button').show();
-        }
-        */
         if (!showProcessButtons) {
             $('#MainCommands button').hide();
             $('#GoBack').show();
