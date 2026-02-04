@@ -655,6 +655,12 @@ $p.events.on_editor_load = function () {
                     if (!confirm('以下の条件でPDFを出力しますか？\n\n・対象：紐付いている全明細\n・利用者：' + userName)) return;
 
                     try {
+                        //PDF出力前に、現在の並び順を保存する処理
+                        const updateSuccess = await updateChildOrder();
+                        
+                        // 保存に失敗した場合（キャンセル含む）は、PDF出力を中断する
+                        if (!updateSuccess) return;
+
                         const sortKey = (typeof TRAFREC_CLASS_DATANO !== 'undefined') ? TRAFREC_CLASS_DATANO : 'NumB';
                         var result = await apiGetAsync({
                             id: CHILD_TABLE_ID,
