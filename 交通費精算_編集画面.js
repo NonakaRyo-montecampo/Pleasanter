@@ -41,6 +41,7 @@ $p.events.on_editor_load = function () {
         way:         'ClassD',
         trip:        'ClassH',
         amount:      'NumC',
+        totalamount: 'NumA',
         memo:        'Body',
         approvedDate: 'DateB'
     };
@@ -505,9 +506,6 @@ $p.events.on_editor_load = function () {
             }
         }
 
-        // ★ここで共有変数を更新 (asyncの結果を反映)
-        //isGeneralAffairs = (myDept === GA_DEPT_NAME);
-
         // ---------------------------------------------------------------
         // 2. 権限判定
         // ---------------------------------------------------------------
@@ -679,7 +677,7 @@ $p.events.on_editor_load = function () {
                             sendDataList.push({
                                 "id": row.IssueId, "date": formatDate(row[FIELD_MAP.date]), "requestdate": $p.getControl(CLASS_REQUESTDATE).text(),
                                 "user": userName, "destination": row[FIELD_MAP.destination], "dep": row[FIELD_MAP.dep], "arr": row[FIELD_MAP.arr],
-                                "way": row[FIELD_MAP.way], "trip": row[FIELD_MAP.trip], "amount": row[FIELD_MAP.amount], "memo": row[FIELD_MAP.memo]
+                                "way": row[FIELD_MAP.way], "trip": row[FIELD_MAP.trip], "amount": row[FIELD_MAP.totalamount], "memo": row[FIELD_MAP.memo]
                             });
                         });
 
@@ -824,4 +822,7 @@ $p.events.on_editor_load = function () {
     setupSortableChildTable();
     //#endregion
 
+    //#region<上長未記入で上長承認スキップ機能>
+
+    //#endregion
 };
