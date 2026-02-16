@@ -1,6 +1,6 @@
 // 交通費申請レコード　編集画面
 $p.events.on_editor_load = function () {
-    
+
     //#region<【重要】リンクエリアの非表示（セキュリティ対策）>
     // =========================================================================
     // ▼ 画面下部の「リンク」セクションを強制的に非表示にする
@@ -390,7 +390,14 @@ $p.events.on_editor_load = function () {
                 // 許可するステータスID
                 const ALLOWED_STATUS_IDS = [TRANSREPOTABLE_ID_CREATE, TRANSREPOTABLE_ID_REJECT];
 
-                if (!ALLOWED_STATUS_IDS.includes(pStatusId) || String(parentRecord[TRANSREPOTABLE_CLASS_CREATOR]) !== String($p.userId())) {
+                //総務部編集可能であればsessionStorageから読み取り
+                const SESSION_KEY_GA_EDITABLE = 'TrafficApp_GeneralAffairsEditable'
+                const gaEditableId = sessionStorage.getItem(SESSION_KEY_GA_EDITABLE);
+
+                if(String(gaEditableId) === String($p.userId())){
+
+                }
+                else if (!ALLOWED_STATUS_IDS.includes(pStatusId) || String(parentRecord[TRANSREPOTABLE_CLASS_CREATOR]) !== String($p.userId())) {
                     console.log("Block Edit: Parent status ID is " + pStatusId);
                     
                     // アラート表示

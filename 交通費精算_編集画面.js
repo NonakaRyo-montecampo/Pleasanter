@@ -1,10 +1,25 @@
 // 交通費申請　編集画面
 $p.events.on_editor_load = function () {
+    //#region<使用環境毎の設定定数> ※新環境でこのスクリプトを導入する際は必ずここの定数に値を書き加えること。
+    //===============================================================================================================================================
+
+    //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
+    const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
+    const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
+    const WORKERTABLE_ID = 15337991;    //「従業員一覧」テーブルID
+    const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
+    const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
+    //総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例用の変数。特に理由が無ければfalse推奨)
+    //交通費精算レコード_編集画面.js側と統一させること
+    const GeneralAffairs_editable = true;
+
+    //===============================================================================================================================================
+    //#endregion
 
     //#region<定数定義>
     
     //ログインユーザID
-    const currentUserId = String($p.userId()); 
+    const currentUserId = String($p.userId());
 
     // =========================================================================
     // 【設定エリア】
@@ -19,17 +34,20 @@ $p.events.on_editor_load = function () {
 
     const GA_DEPT_NAME = '総務管理部';  
     
-    const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
-    const CHILD_TABLE_ID = 15339887;   
     const LINK_COLUMN_NAME = 'ClassI'; 
     const PARENT_USER_COLUMN = 'ClassA'; 
 
     // ステータスID定義
-    const STATUS_CREATING = '作成中'; 
-    const STATUS_REJECT = '差し戻し'; 
-    const STATUS_APPROVAL = '承認待ち';
-    const STATUS_UNDERREV = '決済待ち';
-    const STATUS_COMPLETED = '完了'; 
+    // 現在のステータス取得
+    const currentStatus = $p.getControl('Status').text();
+    const STATUS_TEXT = {
+       creating: '作成中',
+       approval: '承認待ち',
+       underrev: '決済待ち',
+       underset: '精算待ち',
+       completed: '完了',
+       reject: '差し戻し'
+    }
 
     //「交通費精算レコード」テーブル
     const TRAFREC_CLASS_DATANO = 'NumB'; //「清算書内データNo」欄
@@ -47,12 +65,10 @@ $p.events.on_editor_load = function () {
     };
 
     //「従業員一覧」テーブル
-    const WORKERTABLE_ID = 15337991;
     const WORKERTABLE_CLASS_USER = "ClassQ"; 
     const WORKERTABLE_CLASS_DEPT = "ClassB"; 
 
     // 「お気に入り経路」テーブル
-    const FAV_TABLE_ID = 15951290;
     const FAV_USER_COL = 'ClassD'; 
     const FAV_CLASS_NAME = 'Title';
     const FAV_FIELD_MAP = {
@@ -66,7 +82,6 @@ $p.events.on_editor_load = function () {
     };
 
     //「経路履歴」テーブル
-    const HIST_TABLE_ID = 15960204;
     const HIST_USER_COL = 'ClassD'; 
     const HIST_REGISTDATE = 'DateA';
     const HIST_MEMO = 'Body';
@@ -80,6 +95,9 @@ $p.events.on_editor_load = function () {
         way:         'ClassC',
         amount:      'NumA'
     };
+
+    //sessionStorageキー
+    const SESSION_KEY_GA_EDITABLE = 'TrafficApp_GeneralAffairsEditable'
 
     // =========================================================================
     // 指定項目読み取り専用化
@@ -96,14 +114,14 @@ $p.events.on_editor_load = function () {
         // 2. 入力欄自体のロック
         $ctrl.prop('readonly', true).css({
             'pointer-events': 'none',
-            'background-color': '#fff', 
+            'background-color': '#F5F5F5', 
             'cursor': 'default'
         });
         // 3. 通常のアイコン（人アイコンなど）を隠す
         $ctrl.siblings('.ui-icon-person').hide();
     };
-    // 現在のステータス取得
-    const currentStatus = $p.getControl('Status').text();
+
+
     //#endregion
 
     //#region<関数定義>
@@ -520,10 +538,11 @@ $p.events.on_editor_load = function () {
         
         //ステータスチェック
         const st = $p.getControl('Status').text(); 
-        const isStatusEdit = (st === STATUS_CREATING || st === STATUS_REJECT);
-        const isStatusApproval = (st === STATUS_APPROVAL);
-        const isStatusPayment = (st === STATUS_UNDERREV); 
-        const isStatusCompleted = (st === STATUS_COMPLETED); 
+        const isStatusEdit = (st === STATUS_TEXT.creating || st === STATUS_TEXT.reject);
+        const isStatusApproval = (st === STATUS_TEXT.approval);
+        const isStatusPayment = (st === STATUS_TEXT.underrev);
+        const isStatusSettling = (st === STATUS_TEXT.underset);
+        const isStatusCompleted = (st === STATUS_TEXT.completed); 
 
         console.log(`=== Access Control (User ID Mode) ===`);
         console.log(`Me: ${currentUserId}, Dept: "${myDept}"`);
@@ -543,11 +562,24 @@ $p.events.on_editor_load = function () {
             allowEditFields = false;
             showProcessButtons = true; 
         }
-        else if ((isStatusPayment || isStatusCompleted) && isGeneralAffairs) {
+        else if ((isStatusPayment || isStatusSettling || isStatusCompleted) && isGeneralAffairs) {
             allowEditFields = false;
             showProcessButtons = true; 
         }
+        //総務管理部編集権限 - 特例を許可する場合
+        if (GeneralAffairs_editable && isGeneralAffairs){
+            allowEditFields = true;
+        }
+
         console.log('allowEditField: ' + allowEditFields + ', showProcessButtons: ' + showProcessButtons);
+
+        //総務部編集可能であればsessionStorageにログインユーザーIDを保存
+        if(GeneralAffairs_editable && isGeneralAffairs){
+            sessionStorage.setItem(SESSION_KEY_GA_EDITABLE, currentUserId);
+        }
+        else{
+            sessionStorage.removeItem(SESSION_KEY_GA_EDITABLE);
+        }
         //#endregion
 
         //#region<<権限毎の画面制御>>
@@ -556,7 +588,7 @@ $p.events.on_editor_load = function () {
         setReadOnlyStyle(CLASS_GAFIXDATE);
         setReadOnlyStyle(CLASS_GAID);
         //差し戻し時は申請日も読み取り専用化
-        if(currentStatus === STATUS_REJECT)setReadOnlyStyle(CLASS_REQUESTDATE);
+        if(currentStatus === STATUS_TEXT.reject)setReadOnlyStyle(CLASS_REQUESTDATE);
     
         // 4. 画面制御実行
         if (allowEditFields) {
@@ -572,31 +604,6 @@ $p.events.on_editor_load = function () {
             $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]').hide();
 
             const $fields = $('#FieldSetGeneral');
-            /*
-            // 透明カーテン方式で日付を入力する項目の時計アイコンのクリック制御する場合
-            $fields.find('date-field').each(function() {
-                // 親要素（container-normal等）を取得
-                const $wrapper = $(this).parent();
-                
-                // 親要素を相対配置にする（カーテンの位置基準にするため）
-                $wrapper.css('position', 'relative');
-                
-                // 透明カーテンを作成して被せる
-                const $curtain = $('<div>').css({
-                    'position': 'absolute',
-                    'top': '0',
-                    'left': '0',
-                    'width': '100%',
-                    'height': '100%',
-                    'z-index': '9999',      // 最前面に表示
-                    'background-color': 'transparent', // 透明
-                    'cursor': 'default'     // カーソルを通常矢印に
-                });
-                
-                // カーテンを追加
-                $wrapper.append($curtain);
-            });
-            */
            // ★追加: 画面内のすべての date-field (時計アイコンの箱) を破壊して中身だけにする
             $fields.find('date-field').each(function() {
                 const $wrapper = $(this);
@@ -611,7 +618,7 @@ $p.events.on_editor_load = function () {
             $fields.find('input, select, textarea').prop('readonly', true);
             $fields.find('input, select, textarea, label').css({
                 'pointer-events': 'none',
-                'background-color': '#fff', 
+                'background-color': '#F5F5F5', 
                 'color': 'inherit',         
                 'cursor': 'default'         
             });
@@ -708,24 +715,25 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region<自動入力系>
+    //作成者(初期起動時に以下実行)
     if($p.getControl(CLASS_CREATOR).val() === ''){
         $p.set($p.getControl(CLASS_CREATOR), $p.userId());
     }
-
-    if(currentStatus === STATUS_UNDERREV && $p.getControl(CLASS_MANFIXDATE).val() === ''){
+    //承認日(上長)
+    if(currentStatus === STATUS_TEXT.underrev && $p.getControl(CLASS_MANFIXDATE).val() === ''){
         const today = new Date();
         $p.set($p.getControl(CLASS_MANFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
     }
-    else if(currentStatus !== STATUS_UNDERREV && currentStatus !== STATUS_COMPLETED && $p.getControl(CLASS_MANFIXDATE).val() !== ''){
+    else if(currentStatus !== STATUS_TEXT.underrev && currentStatus !== STATUS_TEXT.underset && currentStatus !== STATUS_TEXT.completed && $p.getControl(CLASS_MANFIXDATE).val() !== ''){
         $p.set($p.getControl(CLASS_MANFIXDATE), '');
     }
-
-    if(currentStatus === STATUS_COMPLETED && $p.getControl(CLASS_GAFIXDATE).val() === ''){
+    //承認日(総務部)
+    if(currentStatus === STATUS_TEXT.underset && $p.getControl(CLASS_GAFIXDATE).val() === ''){
         const today = new Date();
         $p.set($p.getControl(CLASS_GAFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
         $p.set($p.getControl(CLASS_GAID), $p.userId());
     }
-    else if(currentStatus !== STATUS_COMPLETED && $p.getControl(CLASS_GAFIXDATE).val() !== ''){
+    else if(currentStatus !== STATUS_TEXT.underset && currentStatus !== STATUS_TEXT.completed && $p.getControl(CLASS_GAFIXDATE).val() !== ''){
         $p.set($p.getControl(CLASS_GAFIXDATE), '');
     }
     //#endregion
