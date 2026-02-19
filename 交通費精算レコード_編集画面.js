@@ -22,9 +22,13 @@ $p.events.on_editor_load = function () {
     const CLASS_RECORDNO = 'NumB'; //「精算書内データNo」欄
     const CLASS_ONEWAY = 'ClassH'; //「片道/往復」欄
     const CLASS_COST_ONEWAY = 'NumC'; //「金額(片道)」欄
+    const CLASS_ATTACHMENT = 'AttachmentsA'; //「添付ファイル」欄
 
     // 「片道」と判定する値（選択肢の「値」に合わせて修正してください。通常は文字列なら'片道'、数値ならその数値）
     const VAL_ONEWAY = '片道'; 
+
+    //インボイス必要価格(この値以上の時に領収書登録を要求)
+    const WARNING_AMOUNT = 30000;
 
     //以下「交通費精算書」テーブル情報
     //-------------------------------------------------------------------------------------
@@ -367,6 +371,86 @@ $p.events.on_editor_load = function () {
     //関数定義はここまで
     //#endregion
 
+    //#region<インボイス処理(3万円以上の際の処理)>
+    // =========================================================================
+    // ★追加機能: 3万円以上の領収書警告 & 保存ブロック
+    // =========================================================================
+
+    //インボイス用領収書登録の警告用関数(汎用)
+    // 警告メッセージ表示用の箱
+    const WARNING_MSG = '※交通費が3万円以上となる場合、インボイス対応の領収書登録が必須です。';
+    const $warningBox = $('<div id="ReceiptWarning" style="color: red; font-weight: bold; padding: 10px; background-color: #ffe6e6; border: 1px solid red; margin-bottom: 10px; display: none;"></div>');
+    $warningBox.text(WARNING_MSG);
+    $('#FieldSetGeneral').prepend($warningBox);
+
+    // ▼▼▼ 1. 警告表示のロジック（表示のみ制御） ▼▼▼
+    const checkAmountWarning = () => {
+        const val = parseInt($p.getControl(CLASS_COST_ONEWAY).val()) || 0;
+        if (val >= WARNING_AMOUNT) {
+            if (!$warningBox.is(':visible')) $warningBox.slideDown();
+        } else {
+            $warningBox.slideUp();
+        }
+    };
+
+    //領収書未登録時の保存拒否用関数
+    const checkFileWarning = () => {
+
+        const val = parseInt($p.getControl(CLASS_COST_ONEWAY).val()) || 0;
+        
+        // 金額が3万円以上の場合のみチェック
+        if (val >= WARNING_AMOUNT) {
+            // 添付ファイルがあるかチェック（ゴミ箱アイコンの数でファイル数を判定）
+            // ※プリザンターの仕様上、添付ファイル項目内の要素数を数えるのが確実です
+            const fileCount = $('#' + CLASS_ATTACHMENT).find('.ui-icon-trash').length;
+
+            if (fileCount === 0) {
+                // ファイルがないのでブロック
+                alert("【エラー】\n交通費が3万円を超えています。\n領収書画像を添付してから保存してください。");
+                
+                // 該当箇所までスクロールしてあげる（親切設計）
+                $('html, body').animate({
+                    scrollTop: $p.getControl(CLASS_ATTACHMENT).offset().top - 100
+                }, 300);
+                
+                //条件未達成(保存不可制御に使用する用bool戻り値)
+                return false;
+            }
+        }
+        //条件未達成(保存制御に使用する用bool戻り値)
+        return true; 
+    };
+
+    // 画面操作の監視
+    checkAmountWarning();
+    $p.getControl(CLASS_COST_ONEWAY).on('change keyup', checkAmountWarning);
+
+    // ▼▼▼ 2. 保存ボタンを押した時のブロックロジック（ここが重要！） ▼▼▼
+    // すでに before_send がある場合は、その中に追記してください
+    const originalBeforeSend = $p.events.before_send; // 既存の処理を退避
+
+    //更新ボタン制御
+    $p.events.before_send = function (args) {
+        console.log('DEBUG: args:');
+        console.log(args);
+
+        // 既存の処理があれば先に実行（並び替え処理など）
+        if (originalBeforeSend && originalBeforeSend(args) === false) {
+            console.log('another operation exists.');
+            return false;
+        }
+
+        //更新ボタンが押された場合のみ処理
+        if(args.data.ControlId === 'UpdateCommand'){
+            return checkFileWarning();
+        }
+
+        //それ以外は通常通り施行
+        return true;
+    };
+
+    //#endregion
+
     //#region<親ステータスチェック（直接URLアクセス対策・修正版）>
     // =========================================================================
     // ▼ 親レコードのステータス(ID)を確認し、編集不可なら画面をロックする
@@ -498,6 +582,9 @@ $p.events.on_editor_load = function () {
                 } else if (parentId) {
                     $p.set($p.getControl(COL_LINK_TRANSREPO), parentId);
                 }
+
+                // インボイス要否チェック
+                checkAmountWarning();
 
             } catch (e) {
                 console.error('自動入力処理でエラー:', e);
@@ -737,7 +824,13 @@ $p.events.on_editor_load = function () {
 
     // (D) 共通保存処理関数（OCR対応版）
     const saveAndRedirect = async (mode) => {
+        //領収書未登録確認
+        if(!checkFileWarning()){
+            return;
+        }
+
         console.log("Start to save... Mode:" + mode);
+        
         try {
             const safeParentId = getParentId();
             if (!safeParentId) { 
@@ -758,6 +851,7 @@ $p.events.on_editor_load = function () {
             
             // 遷移先決定ロジック
             let targetUrl = '';
+            
             
             if (mode === 'ocr_continue') {
                 // --- OCR連続登録処理 ---

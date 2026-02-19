@@ -9,8 +9,7 @@ $p.events.on_editor_load = function () {
     const WORKERTABLE_ID = 15337991;    //「従業員一覧」テーブルID
     const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
     const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
-    //総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例用の変数。特に理由が無ければfalse推奨)
-    //交通費精算レコード_編集画面.js側と統一させること
+    //総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例権限用の変数。特に理由が無ければfalse推奨)
     const GeneralAffairs_editable = true;
 
     //===============================================================================================================================================
@@ -148,8 +147,6 @@ $p.events.on_editor_load = function () {
         if (isNaN(date.getDate())) return dateStr; 
         return (date.getMonth() + 1) + '/' + date.getDate();
     }
-
-
 
     //子レコードの並び順を現在の見た目通りに更新する共通関数
     const updateChildOrder = async () => {
@@ -738,13 +735,11 @@ $p.events.on_editor_load = function () {
     }
     //#endregion
 
-    //#region <子レコード並び替え & 一括更新機能（軽量化・ID修正版）>
+    //#region <子レコード並び替え & 一括更新機能>
     // =========================================================================
     // ▼ 子テーブルの行をドラッグ＆ドロップで並び替え可能にし、
     //    保存時に「見た目の順番通り」に番号を振り直す処理
     // =========================================================================
-
-
     // 1. 並び替えUIの有効化
     const setupSortableChildTable = () => {
         const $childTableBody = $(`table[data-id="${CHILD_TABLE_ID}"] tbody`);
