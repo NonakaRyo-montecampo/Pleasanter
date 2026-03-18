@@ -6,7 +6,7 @@ $p.events.on_editor_load = function () {
     //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
     const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
     const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
-    const WORKERTABLE_ID = 15337991;    //「従業員一覧」テーブルID
+    // const WORKERTABLE_ID = 15337991;    //「従業員一覧」テーブルID
     const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
     const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
     //総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例権限用の変数。特に理由が無ければfalse推奨)
@@ -31,8 +31,10 @@ $p.events.on_editor_load = function () {
     const CLASS_USER = 'ClassA'; //「申請者」(User ID)
     const CLASS_CREATOR = 'ClassD'; //「作成者」(User ID)
 
-    const GA_DEPT_NAME = '総務管理部';  
-    
+    // const GA_DEPT_NAME = '総務管理部';
+    const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
+    const GAAPP_GROUP_ID = 3304;    //「総務承認者」グループID
+
     const LINK_COLUMN_NAME = 'ClassI'; 
     const PARENT_USER_COLUMN = 'ClassA'; 
 
@@ -43,6 +45,7 @@ $p.events.on_editor_load = function () {
        creating: '作成中',
        approval: '承認待ち',
        underrev: '決済待ち',
+       finalapp: '総務承認待ち',
        underset: '精算待ち',
        completed: '完了',
        reject: '差し戻し'
@@ -64,8 +67,8 @@ $p.events.on_editor_load = function () {
     };
 
     //「従業員一覧」テーブル
-    const WORKERTABLE_CLASS_USER = "ClassQ"; 
-    const WORKERTABLE_CLASS_DEPT = "ClassB"; 
+    // const WORKERTABLE_CLASS_USER = "ClassQ"; 
+    // const WORKERTABLE_CLASS_DEPT = "ClassB"; 
 
     // 「お気に入り経路」テーブル
     const FAV_USER_COL = 'ClassD'; 
@@ -487,12 +490,123 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region<メイン処理：アクセス制御とUI構築>
+    //ユーザーの所属グループ取得
+    /*
+    const checkUserGroupAsync = async (groupId) => {
+        return new Promise((resolve) => {
+            $p.apiGroupsGet({
+                data:{
+                    View: {
+                        ColumnFilterHash: {
+                            GroupId: '[' + groupId + ']'
+                        }
+                    }
+                },
+                done: function(res) {
+                    try{
+                        if (res.StatusCode === 200 && res.Response.Data.length > 0) {
+                        const members = res.Response.Data[0].GroupMembers || [];
+                        const consist_in_group = members.filter(member => member.split(',').includes(String($p.userId())));
+                        // console.log("DEBUG: Read Group member data: "); //for debug
+                        // console.log(members);                           //for debug
+                        // console.log("DEBUG: Consist in Group: ");       //for debug
+                        // console.log(consist_in_group);                  //for debug
+                        resolve(true ? consist_in_group.length > 0 : false);
+                        } else {
+                            //console.log("DEBUG: Read Group ID: fail to read data, StatusCode: " + res.StatusCode);
+                            resolve(false);
+                        }
+                    }
+                    catch (e) {
+                        console.error("グループ情報の取得に失敗", e);
+                        resolve(false);
+                    }  
+                },
+                fail: function(err) {
+                    console.error("User API Error:", err);
+                    resolve(false);
+                }
+            });
+        });
+    };
+    */
+    const checkUserGroupAsync = async (groupId, sessionkey) => {
+        const cachedSession = sessionStorage.getItem(sessionkey);
+        if(cachedSession !== null){
+            return (cachedSession === 'true');
+        }
+        else{
+            return new Promise((resolve) => {
+                $p.apiGroupsGet({
+                    data:{
+                        View: {
+                            ColumnFilterHash: {
+                                GroupId: '[' + groupId + ']'
+                            }
+                        }
+                    },
+                    done: function(res) {
+                        try{
+                            if (res.StatusCode === 200 && res.Response.Data.length > 0) {
+                                const members = res.Response.Data[0].GroupMembers || [];
+                                const consist_in_group = members.filter(member => member.split(',').includes(String($p.userId())));
+                                console.log("DEBUG: Read Group member data: "); //for debug
+                                console.log(members);                           //for debug
+                                console.log("DEBUG: Consist in Group: ");       //for debug
+                                console.log(consist_in_group);                  //for debug
+                                const returnbool = consist_in_group.length > 0;
+                                sessionStorage.setItem(sessionkey, returnbool);
+                                resolve(returnbool);
+                            } else {
+                                //console.log("DEBUG: Read Group ID: fail to read data, StatusCode: " + res.StatusCode);
+                                resolve(false);
+                            }
+                        }
+                        catch (e) {
+                            console.error("グループ情報の取得に失敗", e);
+                            resolve(false);
+                        }  
+                    },
+                    fail: function(err) {
+                        console.error("User API Error:", err);
+                        resolve(false);
+                    }
+                });
+            });
+        }
+        
+    };
+
     (async () => {
         //#region<<権限確認>>
         // ---------------------------------------------------------------
         // 1. 情報取得（キャッシュ対応版）
         // ---------------------------------------------------------------
-        //const currentUserId = String($p.userId()); // ログインユーザーID
+        //グループチェック
+        //const groupCheck = async(groupId)
+
+        // 経理担当グループ判定
+        const SESSION_KEY_IS_KEIRI = 'TrafficApp_IsKeiri_' + currentUserId;
+        let isKeiriMember = await checkUserGroupAsync(KEIRI_GROUP_ID, SESSION_KEY_IS_KEIRI);
+        /*
+        let isKeiriMember = false;
+        const cachedIsKeiri = sessionStorage.getItem(SESSION_KEY_IS_KEIRI);
+
+        if (cachedIsKeiri !== null) {
+            isKeiriMember = (cachedIsKeiri === 'true'); // 文字列からbooleanに変換
+            console.log("DEBUG: Load Keiri Group from Cache: " + isKeiriMember);
+        } 
+        else {
+            isKeiriMember = await checkUserGroupAsync(KEIRI_GROUP_ID);
+            sessionStorage.setItem(SESSION_KEY_IS_KEIRI, isKeiriMember);
+            console.log("DEBUG: Fetch Keiri Group from API & Saved: " + isKeiriMember);
+        }
+        */
+        //総務承認者グループ判定
+        const SESSION_KEY_IS_GAAPP = 'TrafficApp_IsGAApp_' + currentUserId;
+        let isGAAppMember = await checkUserGroupAsync(GAAPP_GROUP_ID, SESSION_KEY_IS_GAAPP);
+        // 部署取得アルゴリズム削除
+        /*
         let myDept = '';
 
         const SESSION_KEY_MY_DEPT = 'TrafficApp_MyDept_' + currentUserId;
@@ -520,6 +634,7 @@ $p.events.on_editor_load = function () {
                 console.error("部署情報の取得に失敗", e);
             }
         }
+        */
 
         // ---------------------------------------------------------------
         // 2. 権限判定
@@ -531,47 +646,57 @@ $p.events.on_editor_load = function () {
         
         const isApplicant = (currentUserId === applicantId) || (currentUserId === creatorId);
         const isSuperior = (superiorId !== '' && currentUserId === superiorId);
-        const isGeneralAffairs = (myDept === GA_DEPT_NAME);
+        // const isGeneralAffairs = (myDept === GA_DEPT_NAME);
         
         //ステータスチェック
         const st = $p.getControl('Status').text(); 
         const isStatusEdit = (st === STATUS_TEXT.creating || st === STATUS_TEXT.reject);
         const isStatusApproval = (st === STATUS_TEXT.approval);
         const isStatusPayment = (st === STATUS_TEXT.underrev);
+        const isStatusFinalApproval = (st === STATUS_TEXT.finalapp);
         const isStatusSettling = (st === STATUS_TEXT.underset);
         const isStatusCompleted = (st === STATUS_TEXT.completed); 
 
         console.log(`=== Access Control (User ID Mode) ===`);
-        console.log(`Me: ${currentUserId}, Dept: "${myDept}"`);
+        console.log(`Me: ${currentUserId}`);
         console.log(`Target -> App: "${applicantId}", Sup: "${superiorId}"`);
-        console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isGeneralAffairs}`);
+        console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isKeiriMember}`);
         console.log(`=====================================`);
 
         // 3. 権限付与ロジック
         let allowEditFields = false; 
         let showProcessButtons = false; 
 
+        //申請者作成関連
         if (isStatusEdit && isApplicant) {
             allowEditFields = true;
             showProcessButtons = true;
         }
+        //上長承認関連
         else if (isStatusApproval && isSuperior) {
             allowEditFields = false;
             showProcessButtons = true; 
         }
-        else if ((isStatusPayment || isStatusSettling || isStatusCompleted) && isGeneralAffairs) {
+        //経理担当処理関連
+        else if ((isStatusPayment || isStatusSettling || isStatusCompleted) && isKeiriMember) {
             allowEditFields = false;
             showProcessButtons = true; 
         }
+        //総務承認者担当関連
+        else if(isStatusFinalApproval && isGAAppMember){
+            allowEditFields = false;
+            showProcessButtons = true; 
+        }
+        
         //総務管理部編集権限 - 特例を許可する場合
-        if (GeneralAffairs_editable && isGeneralAffairs){
+        if (GeneralAffairs_editable && isKeiriMember){
             allowEditFields = true;
         }
 
         console.log('allowEditField: ' + allowEditFields + ', showProcessButtons: ' + showProcessButtons);
 
         //総務部編集可能であればsessionStorageにログインユーザーIDを保存
-        if(GeneralAffairs_editable && isGeneralAffairs){
+        if(GeneralAffairs_editable && isKeiriMember){
             sessionStorage.setItem(SESSION_KEY_GA_EDITABLE, currentUserId);
         }
         else{
@@ -642,7 +767,7 @@ $p.events.on_editor_load = function () {
 
         //#region<<PDFボタン>>
         // 新規作成以外且つ総務部の場合にPDFボタンを追加する
-        if($p.action() !== 'new' && isGeneralAffairs){
+        if($p.action() !== 'new' && isKeiriMember){
             // 一度ボタンがあるか確認して、なければ追加（二重追加防止）
             if ($('#BtnPrintPdfParent').length === 0) {
                 $('#MainCommands').append('<button id="BtnPrintPdfParent" class="button button-icon ui-button ui-corner-all ui-widget"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-document"></span>PDF出力</button>');
