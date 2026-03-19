@@ -15,6 +15,25 @@ $p.events.on_editor_load = function () {
     //===============================================================================================================================================
     //#endregion
 
+    //#region<標準の離脱警告ポップアップ無効化>
+    // =========================================================================
+    // ▼ プリザンター標準の「変更が保存されていません」ポップアップを完全に無効化
+    // =========================================================================
+    const disableDefaultWarning = () => {
+        $(window).off('beforeunload'); // jQueryで設定されたイベントを解除
+        window.onbeforeunload = null;  // ネイティブJSで設定されたイベントを解除
+    };
+
+    // 1. 画面表示時にまずは解除
+    disableDefaultWarning();
+
+    // 2. 入力変更時にプリザンターが裏側で再設定してくるのを待ち伏せて、即座に解除
+    // ※setTimeoutを使うことで、プリザンターの内部処理が終わった直後に確実に解除できます
+    $(document).on('change keyup', 'input, select, textarea', function() {
+        setTimeout(disableDefaultWarning, 10);
+    });
+    //#endregion
+
     //#region<定数定義>
     
     //ログインユーザID
@@ -848,16 +867,12 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region<自動入力系>
-    //for debug
-    console.log("DEBUG: SUP FIX DATE: " + $p.getControl(CLASS_SUPFIXDATE).val());
-    console.log("DEBUG: ACC FIX DATE: " + $p.getControl(CLASS_ACCFIXDATE).val());
-    console.log("DEBUG: GA FIX DATE: " + $p.getControl(CLASS_GAFIXDATE).val());
     //作成者(初期起動時に以下実行)
     if($p.getControl(CLASS_CREATOR).val() === ''){
         $p.set($p.getControl(CLASS_CREATOR), $p.userId());
     }
     //承認日(上長)
-    if(currentStatus === STATUS_TEXT.underrev && $p.getControl(CLASS_SUPFIXDATE).val() === ''){
+    if(currentStatus === STATUS_TEXT.approval/*currentStatus === STATUS_TEXT.underrev && $p.getControl(CLASS_SUPFIXDATE).val() === ''*/){
         const today = new Date();
         $p.set($p.getControl(CLASS_SUPFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
     }
@@ -865,7 +880,7 @@ $p.events.on_editor_load = function () {
         $p.set($p.getControl(CLASS_SUPFIXDATE), '');
     }
     //承認日(経理担当)
-    if(currentStatus === STATUS_TEXT.finalapp && $p.getControl(CLASS_ACCFIXDATE).val() === ''){
+    if(currentStatus === STATUS_TEXT.underrev/*currentStatus === STATUS_TEXT.finalapp && $p.getControl(CLASS_ACCFIXDATE).val() === ''*/){
         const today = new Date();
         $p.set($p.getControl(CLASS_ACCFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
         $p.set($p.getControl(CLASS_ACCID), $p.userId());
@@ -874,7 +889,7 @@ $p.events.on_editor_load = function () {
         $p.set($p.getControl(CLASS_ACCFIXDATE), '');
     }
     //承認日(総務承認)
-    if(currentStatus === STATUS_TEXT.underset && $p.getControl(CLASS_GAFIXDATE).val() === ''){
+    if(currentStatus === STATUS_TEXT.finalapp/*currentStatus === STATUS_TEXT.underset && $p.getControl(CLASS_GAFIXDATE).val() === ''*/){
         const today = new Date();
         $p.set($p.getControl(CLASS_GAFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
         $p.set($p.getControl(CLASS_GAID), $p.userId());
