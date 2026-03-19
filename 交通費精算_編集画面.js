@@ -23,13 +23,18 @@ $p.events.on_editor_load = function () {
     // =========================================================================
     // 【設定エリア】
     // =========================================================================
+    const CLASS_USER = 'ClassA';        //「申請者」(User ID)
+    const CLASS_SUPERIOR = 'ClassB';    //「上長」(User ID)
+    const CLASS_ACCID = 'ClassC';       //「経理担当」(User ID)
+    const CLASS_GAID = 'ClassE';        //「総務承認者」(User ID)
+    const CLASS_CREATOR = 'ClassD';     //「作成者」(User ID)
     const CLASS_REQUESTDATE = 'DateA';  //「申請日」
-    const CLASS_MANFIXDATE = 'DateB';  //「承認日(上長)」
-    const CLASS_GAFIXDATE = 'DateC';  //「承認日(総務部)」
-    const CLASS_SUPERIOR = 'ClassB'; //「上長」(User ID)
-    const CLASS_GAID = 'ClassC'; //「承認者」(User ID)
-    const CLASS_USER = 'ClassA'; //「申請者」(User ID)
-    const CLASS_CREATOR = 'ClassD'; //「作成者」(User ID)
+    const CLASS_SUPFIXDATE = 'DateB';   //「承認日(上長)」
+    const CLASS_ACCFIXDATE = 'DateC';   //「承認日(経理担当)」
+    const CLASS_GAFIXDATE = 'DateE';    //「承認日(総務部)」
+    const CLASS_FIXDATE = 'DateD';      //「精算日」
+    const CLASS_PAYWAY = 'ClassF';      //「精算方法」
+    const PAYWAY_INDIV = '個別支払';    //「精算方法」個別支払いの際のテキスト表記
 
     // const GA_DEPT_NAME = '総務管理部';
     const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
@@ -99,7 +104,7 @@ $p.events.on_editor_load = function () {
     };
 
     //sessionStorageキー
-    const SESSION_KEY_GA_EDITABLE = 'TrafficApp_GeneralAffairsEditable'
+    const SESSION_KEY_ACC_EDITABLE = 'TrafficApp_GeneralAffairsEditable'
 
     // =========================================================================
     // 指定項目読み取り専用化
@@ -491,45 +496,6 @@ $p.events.on_editor_load = function () {
 
     //#region<メイン処理：アクセス制御とUI構築>
     //ユーザーの所属グループ取得
-    /*
-    const checkUserGroupAsync = async (groupId) => {
-        return new Promise((resolve) => {
-            $p.apiGroupsGet({
-                data:{
-                    View: {
-                        ColumnFilterHash: {
-                            GroupId: '[' + groupId + ']'
-                        }
-                    }
-                },
-                done: function(res) {
-                    try{
-                        if (res.StatusCode === 200 && res.Response.Data.length > 0) {
-                        const members = res.Response.Data[0].GroupMembers || [];
-                        const consist_in_group = members.filter(member => member.split(',').includes(String($p.userId())));
-                        // console.log("DEBUG: Read Group member data: "); //for debug
-                        // console.log(members);                           //for debug
-                        // console.log("DEBUG: Consist in Group: ");       //for debug
-                        // console.log(consist_in_group);                  //for debug
-                        resolve(true ? consist_in_group.length > 0 : false);
-                        } else {
-                            //console.log("DEBUG: Read Group ID: fail to read data, StatusCode: " + res.StatusCode);
-                            resolve(false);
-                        }
-                    }
-                    catch (e) {
-                        console.error("グループ情報の取得に失敗", e);
-                        resolve(false);
-                    }  
-                },
-                fail: function(err) {
-                    console.error("User API Error:", err);
-                    resolve(false);
-                }
-            });
-        });
-    };
-    */
     const checkUserGroupAsync = async (groupId, sessionkey) => {
         const cachedSession = sessionStorage.getItem(sessionkey);
         if(cachedSession !== null){
@@ -550,10 +516,10 @@ $p.events.on_editor_load = function () {
                             if (res.StatusCode === 200 && res.Response.Data.length > 0) {
                                 const members = res.Response.Data[0].GroupMembers || [];
                                 const consist_in_group = members.filter(member => member.split(',').includes(String($p.userId())));
-                                console.log("DEBUG: Read Group member data: "); //for debug
-                                console.log(members);                           //for debug
-                                console.log("DEBUG: Consist in Group: ");       //for debug
-                                console.log(consist_in_group);                  //for debug
+                                // console.log("DEBUG: Read Group member data: "); //for debug
+                                // console.log(members);                           //for debug
+                                // console.log("DEBUG: Consist in Group: ");       //for debug
+                                // console.log(consist_in_group);                  //for debug
                                 const returnbool = consist_in_group.length > 0;
                                 sessionStorage.setItem(sessionkey, returnbool);
                                 resolve(returnbool);
@@ -588,20 +554,6 @@ $p.events.on_editor_load = function () {
         // 経理担当グループ判定
         const SESSION_KEY_IS_KEIRI = 'TrafficApp_IsKeiri_' + currentUserId;
         let isKeiriMember = await checkUserGroupAsync(KEIRI_GROUP_ID, SESSION_KEY_IS_KEIRI);
-        /*
-        let isKeiriMember = false;
-        const cachedIsKeiri = sessionStorage.getItem(SESSION_KEY_IS_KEIRI);
-
-        if (cachedIsKeiri !== null) {
-            isKeiriMember = (cachedIsKeiri === 'true'); // 文字列からbooleanに変換
-            console.log("DEBUG: Load Keiri Group from Cache: " + isKeiriMember);
-        } 
-        else {
-            isKeiriMember = await checkUserGroupAsync(KEIRI_GROUP_ID);
-            sessionStorage.setItem(SESSION_KEY_IS_KEIRI, isKeiriMember);
-            console.log("DEBUG: Fetch Keiri Group from API & Saved: " + isKeiriMember);
-        }
-        */
         //総務承認者グループ判定
         const SESSION_KEY_IS_GAAPP = 'TrafficApp_IsGAApp_' + currentUserId;
         let isGAAppMember = await checkUserGroupAsync(GAAPP_GROUP_ID, SESSION_KEY_IS_GAAPP);
@@ -697,17 +649,19 @@ $p.events.on_editor_load = function () {
 
         //総務部編集可能であればsessionStorageにログインユーザーIDを保存
         if(GeneralAffairs_editable && isKeiriMember){
-            sessionStorage.setItem(SESSION_KEY_GA_EDITABLE, currentUserId);
+            sessionStorage.setItem(SESSION_KEY_ACC_EDITABLE, currentUserId);
         }
         else{
-            sessionStorage.removeItem(SESSION_KEY_GA_EDITABLE);
+            sessionStorage.removeItem(SESSION_KEY_ACC_EDITABLE);
         }
         //#endregion
 
         //#region<<権限毎の画面制御>>
         //デフォルトで読み取り専用の項目を読み取り専用化    
-        setReadOnlyStyle(CLASS_MANFIXDATE);
+        setReadOnlyStyle(CLASS_SUPFIXDATE);
+        setReadOnlyStyle(CLASS_ACCFIXDATE);
         setReadOnlyStyle(CLASS_GAFIXDATE);
+        setReadOnlyStyle(CLASS_ACCID);
         setReadOnlyStyle(CLASS_GAID);
         //差し戻し時は申請日も読み取り専用化
         if(currentStatus === STATUS_TEXT.reject)setReadOnlyStyle(CLASS_REQUESTDATE);
@@ -809,9 +763,66 @@ $p.events.on_editor_load = function () {
                                 "way": row[FIELD_MAP.way], "trip": row[FIELD_MAP.trip], "amount": row[FIELD_MAP.totalamount], "memo": row[FIELD_MAP.memo]
                             });
                         });
+                        //承認情報も入力
+                        var sendApprovalList = {};
+                        // 💡 ヘルパー関数: ユーザー項目の「表示名（名前）」を確実に取得する
+                        const getUserName = (classId) => {
+                            const $ctrl = $p.getControl(classId);
+                            // ドロップダウン（select）の場合、選択中のoptionのテキストを取得
+                            let name = $ctrl.find('option:selected').text().trim();
+                            // 読み取り専用などでselectでない場合は、要素のテキストを直接取得
+                            if (!name) name = $ctrl.text().trim();
+                            // それでも取れなければ value を試す（一応のフォールバック）
+                            if (!name) name = $ctrl.val();
+                            return name || "";
+                        };
+                        //申請者(申請日入力済みか)
+                        if($p.getControl(CLASS_REQUESTDATE).text() !== ''){ //申請日項目だけプリザンター側で読み取り専用処理をしているためtextで取得
+                            sendApprovalList.user = {
+                                "name": getUserName(CLASS_USER), // ★修正
+                                "date": $p.getControl(CLASS_REQUESTDATE).text()
+                            };
+                        }
+                        //上長(上長承認日入力済みか)
+                        if($p.getControl(CLASS_SUPFIXDATE).val() !== ''){
+                            sendApprovalList.superior = {
+                                "name": getUserName(CLASS_SUPERIOR), // ★修正
+                                "date": $p.getControl(CLASS_SUPFIXDATE).val()
+                            };
+                        }
+                        //経理担当(経理決算日入力済みか)
+                        if($p.getControl(CLASS_ACCFIXDATE).val() !== ''){
+                            sendApprovalList.accounting = {
+                                "name": getUserName(CLASS_ACCID), // ★修正
+                                "date": $p.getControl(CLASS_ACCFIXDATE).val()
+                            };
+                        }
+                        //総務承認者(総務承認日入力済みか)
+                        if($p.getControl(CLASS_GAFIXDATE).val() !== ''){
+                            sendApprovalList.generalaffair = {
+                                "name": getUserName(CLASS_GAID), // ★修正
+                                "date": $p.getControl(CLASS_GAFIXDATE).val()
+                            };
+                        }
+                        //精算完了(精算日入力済みか) ※給与組み込みの際は入力不要
+                        if($p.getControl(CLASS_FIXDATE).text() !== '' && $p.getControl(CLASS_PAYWAY).text() === PAYWAY_INDIV){ //プリザンター側で読み取り専用処理をしているためtextで取得
+                            sendApprovalList.settlement = {
+                                "name": getUserName(CLASS_ACCID), // ★修正
+                                "date": $p.getControl(CLASS_FIXDATE).text()
+                            };
+                        }
+
+                        const payload = {
+                            "records": sendDataList,
+                            "approval": sendApprovalList
+                        };
+
+                        //for debug
+                        // console.log("DEBUG: made payload for PDF.");
+                        // console.log(payload)
 
                         $.ajax({
-                            type: 'POST', url: GAS_TRANSREPO_URL, contentType: 'text/plain', data: JSON.stringify(sendDataList),
+                            type: 'POST', url: GAS_TRANSREPO_URL, contentType: 'text/plain', data: JSON.stringify(payload),
                             success: function(response) {
                                 try {
                                     var resJson = (typeof response === 'object') ? response : JSON.parse(response);
@@ -837,25 +848,38 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region<自動入力系>
+    //for debug
+    console.log("DEBUG: SUP FIX DATE: " + $p.getControl(CLASS_SUPFIXDATE).val());
+    console.log("DEBUG: ACC FIX DATE: " + $p.getControl(CLASS_ACCFIXDATE).val());
+    console.log("DEBUG: GA FIX DATE: " + $p.getControl(CLASS_GAFIXDATE).val());
     //作成者(初期起動時に以下実行)
     if($p.getControl(CLASS_CREATOR).val() === ''){
         $p.set($p.getControl(CLASS_CREATOR), $p.userId());
     }
     //承認日(上長)
-    if(currentStatus === STATUS_TEXT.underrev && $p.getControl(CLASS_MANFIXDATE).val() === ''){
+    if(currentStatus === STATUS_TEXT.underrev && $p.getControl(CLASS_SUPFIXDATE).val() === ''){
         const today = new Date();
-        $p.set($p.getControl(CLASS_MANFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
+        $p.set($p.getControl(CLASS_SUPFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
     }
-    else if(currentStatus !== STATUS_TEXT.underrev && currentStatus !== STATUS_TEXT.underset && currentStatus !== STATUS_TEXT.completed && $p.getControl(CLASS_MANFIXDATE).val() !== ''){
-        $p.set($p.getControl(CLASS_MANFIXDATE), '');
+    else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_SUPFIXDATE).val() !== ''){
+        $p.set($p.getControl(CLASS_SUPFIXDATE), '');
     }
-    //承認日(総務部)
+    //承認日(経理担当)
+    if(currentStatus === STATUS_TEXT.finalapp && $p.getControl(CLASS_ACCFIXDATE).val() === ''){
+        const today = new Date();
+        $p.set($p.getControl(CLASS_ACCFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
+        $p.set($p.getControl(CLASS_ACCID), $p.userId());
+    }
+    else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_ACCFIXDATE).val() !== ''){
+        $p.set($p.getControl(CLASS_ACCFIXDATE), '');
+    }
+    //承認日(総務承認)
     if(currentStatus === STATUS_TEXT.underset && $p.getControl(CLASS_GAFIXDATE).val() === ''){
         const today = new Date();
         $p.set($p.getControl(CLASS_GAFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
         $p.set($p.getControl(CLASS_GAID), $p.userId());
     }
-    else if(currentStatus !== STATUS_TEXT.underset && currentStatus !== STATUS_TEXT.completed && $p.getControl(CLASS_GAFIXDATE).val() !== ''){
+    else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_GAFIXDATE).val() !== ''){
         $p.set($p.getControl(CLASS_GAFIXDATE), '');
     }
     //#endregion
