@@ -662,6 +662,7 @@ $p.events.on_editor_load = function () {
         //総務管理部編集権限 - 特例を許可する場合
         if (GeneralAffairs_editable && isKeiriMember){
             allowEditFields = true;
+            showProcessButtons = true;
         }
 
         console.log('allowEditField: ' + allowEditFields + ', showProcessButtons: ' + showProcessButtons);
