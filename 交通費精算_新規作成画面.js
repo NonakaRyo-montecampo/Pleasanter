@@ -1,13 +1,9 @@
+//交通費精算　新規作成画面
+//※注意: 一部、クライアントスクリプトとなっているため、オンプレミス版を実装する際に書き換えが必要な箇所がある。
+
 //<定数定義>
 const CLASS_USER = "ClassA"; //「申請者」項目
-//onst CLASS_MAN = "ClassB";  //「上長」項目
 const CLASS_CREATOR = 'ClassD'; //「作成者」(User ID)
-
-//「従業員一覧」テーブルID
-//const WORKERTABLE_ID = 15337991;
-//const WORKERTABLE_CLASS_USER = "ClassQ"; //「ユーザーID」項目
-//const WORKERTABLE_CLASS_MAN = "ClassR";  //「上長」項目
-
 
 //<対象項目の非表示化>
 // ※注意: これはクライアントスクリプト(画面読込時など)用の書き方です
