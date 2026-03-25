@@ -241,7 +241,7 @@ $p.events.on_editor_load = function () {
                             <div id="tab-fav" style="min-height: 150px; padding: 10px 0; border-top: none;"><p id="fav-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
                         </div>
                     </div>
-                    <h4 style="margin-top: 30px; margin-bottom: 10px; font-weight: bold; color: #333; border-bottom: 2px solid #0056b3; padding-bottom: 5px; width: 100%;">
+                    <h4 style="margin-top: 30px; margin-bottom: 10px; font-weight: bold; color: #333; border-bottom: 2px solid #00b32da4; padding-bottom: 5px; width: 100%;">
                         <span class="ui-icon ui-icon-note" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>登録中の交通費情報
                     </h4>
                 </div>`;
