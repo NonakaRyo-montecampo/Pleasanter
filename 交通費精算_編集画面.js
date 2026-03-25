@@ -6,11 +6,17 @@ $p.events.on_editor_load = function () {
     //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
     const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
     const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
-    // const WORKERTABLE_ID = 15337991;    //「従業員一覧」テーブルID
     const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
     const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
     //総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例権限用の変数。特に理由が無ければfalse推奨)
     const GeneralAffairs_editable = true;
+
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★変数ではないが、以下一覧画面用のスクリプトを実装する必要あり。(一覧画面の削除ボタン非表示化) 
+    // ★「テーブル管理」>「スクリプト」から「新規作成」を選択し、スクリプト部に以下のコマンドを記載。
+    // ★　$('#BulkDeleteCommand').hide();                                                      
+    // ★その後、チェックボックスを「一覧」のみ選択し、保存する。                                   
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
     //===============================================================================================================================================
     //#endregion
