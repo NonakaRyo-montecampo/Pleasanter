@@ -391,8 +391,32 @@ $p.events.on_editor_load = function () {
         }
     };
 
+    //全角文字検知(全角数字は半角化, その他文字は削除)
+    // 全角英数字を半角にし、数字以外の文字（ひらがな、漢字、英字、記号など）はすべて削除する汎用関数
+    const formatToNumericOnly = (str) => {
+        if (!str) return '';
+
+        // 1. まず全角英数記号を、VSCodeの魔法のロジックで半角に変換する
+        let converted = String(str).replace(/[\uFF01-\uFF5E]/g, (s) => {
+            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+        });
+
+        // 2. その後、半角数字（0-9）以外のすべての文字を消し去る
+        return converted.replace(/[^0-9]/g, '');
+    };
+
+
     //=====================================================================================================================================================
     //関数定義はここまで
+    //#endregion
+
+    //#region<金額欄の入力制御（全角数字の半角化＆数字以外の文字削除）>
+    $p.on('change', CLASS_COST_ONEWAY, function() {
+        // 関数を使ってきれいな数字だけの文字列にする
+        const cleanNumber = formatToNumericOnly($p.getControl(CLASS_COST_ONEWAY).val());
+        // 入力欄に戻す
+        $p.set($p.getControl(CLASS_COST_ONEWAY), cleanNumber);
+    });
     //#endregion
 
     //#region<インボイス処理(3万円以上の際の処理)>
@@ -981,6 +1005,13 @@ $p.events.on_editor_load = function () {
     // ボタン追加
     if ($p.id()) { 
         $('#MainCommands').append('<button id="BtnRegistFav" class="button button-icon ui-button ui-corner-all ui-widget"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-star"></span>お気に入り登録</button>');
+        // ここでボタンの色を黄色っぽく変更
+        $('#BtnRegistFav').css({
+            'background-color': '#ffc107', // 背景色（少し落ち着いた黄色）
+            'border-color': '#d39e00',     // 枠線の色（少し濃い黄色）
+            'color': '#212529',            // 文字色（視認性を高めるために黒系に）
+            'font-weight': 'bold'          // 文字を太くして目立たせる
+        });
     }
 
     $('#BtnRegistFav').on('click', async function() {
@@ -997,11 +1028,11 @@ $p.events.on_editor_load = function () {
             Title: routeName, // タイトルは定数化せずそのままでOK
             ClassHash: {
                 // ★ブラケット記法 [] を使うことで、定数の値をキーとして展開できます
-                [FAV_FIELDS.DES]:  $p.getControl(CLASS_DESTINATION).val(), // 行先 
-                [FAV_FIELDS.DEP]:  $p.getControl(CLASS_DEP).val(), // 出発
-                [FAV_FIELDS.ARR]:  $p.getControl(CLASS_ARR).val(), // 到着
-                [FAV_FIELDS.WAY]:  $p.getControl(CLASS_TRAFFWAY).val(),  // 交通手段 (子はClassD)
-                [FAV_FIELDS.USER]: $p.userId()                     // 登録ユーザー
+                [FAV_FIELDS.DES]:  $p.getControl(CLASS_DESTINATION).val(),  // 行先 
+                [FAV_FIELDS.DEP]:  $p.getControl(CLASS_DEP).val(),          // 出発
+                [FAV_FIELDS.ARR]:  $p.getControl(CLASS_ARR).val(),          // 到着
+                [FAV_FIELDS.WAY]:  $p.getControl(CLASS_TRAFFWAY).val(),     // 交通手段 (子はClassD)
+                [FAV_FIELDS.USER]: $p.userId()                              // 登録ユーザー
             },
             NumHash: {
                 [FAV_FIELDS.COST]: parseFloat($p.getControl(CLASS_COST_ONEWAY).val().replace(/,/g, '')) || 0
