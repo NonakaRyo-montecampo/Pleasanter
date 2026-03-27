@@ -96,10 +96,6 @@ $p.events.on_editor_load = function () {
         approvedDate: 'DateB'
     };
 
-    //「従業員一覧」テーブル
-    // const WORKERTABLE_CLASS_USER = "ClassQ"; 
-    // const WORKERTABLE_CLASS_DEPT = "ClassB"; 
-
     // 「お気に入り経路」テーブル
     const FAV_USER_COL = 'ClassD'; 
     const FAV_CLASS_NAME = 'Title';
@@ -690,7 +686,7 @@ $p.events.on_editor_load = function () {
         setReadOnlyStyle(CLASS_ACCID);
         setReadOnlyStyle(CLASS_GAID);
         //差し戻し時は申請日も読み取り専用化
-        if(currentStatus === STATUS_TEXT.reject)setReadOnlyStyle(CLASS_REQUESTDATE);
+        if(currentStatus !== STATUS_TEXT.creating)setReadOnlyStyle(CLASS_REQUESTDATE);
     
         // 4. 画面制御実行
         if (allowEditFields) {
@@ -747,7 +743,7 @@ $p.events.on_editor_load = function () {
 
         //#region<<PDFボタン>>
         // 新規作成以外且つ総務部の場合にPDFボタンを追加する
-        if($p.action() !== 'new' && isKeiriMember){
+        if($p.action() !== 'new' && isKeiriMember && currentStatus !== STATUS_TEXT.creating){
             // 一度ボタンがあるか確認して、なければ追加（二重追加防止）
             if ($('#BtnPrintPdfParent').length === 0) {
                 $('#MainCommands').append('<button id="BtnPrintPdfParent" class="button button-icon ui-button ui-corner-all ui-widget"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-document"></span>PDF出力</button>');
@@ -781,16 +777,6 @@ $p.events.on_editor_load = function () {
                         var records = result.Response.Data;
                         if (records.length === 0) { alert('データがありません。'); return; }
 
-                        var sendDataList = [];
-                        records.forEach(function(row) {
-                            sendDataList.push({
-                                "id": row.IssueId, "date": formatDate(row[FIELD_MAP.date]), "requestdate": $p.getControl(CLASS_REQUESTDATE).text(),
-                                "user": userName, "destination": row[FIELD_MAP.destination], "dep": row[FIELD_MAP.dep], "arr": row[FIELD_MAP.arr],
-                                "way": row[FIELD_MAP.way], "trip": row[FIELD_MAP.trip], "amount": row[FIELD_MAP.totalamount], "memo": row[FIELD_MAP.memo]
-                            });
-                        });
-                        //承認情報も入力
-                        var sendApprovalList = {};
                         // 💡 ヘルパー関数: ユーザー項目の「表示名（名前）」を確実に取得する
                         const getUserName = (classId) => {
                             const $ctrl = $p.getControl(classId);
@@ -802,29 +788,42 @@ $p.events.on_editor_load = function () {
                             if (!name) name = $ctrl.val();
                             return name || "";
                         };
+
+                        var sendDataList = [];
+                        records.forEach(function(row) {
+                            sendDataList.push({
+                                "id": row.IssueId, "date": formatDate(row[FIELD_MAP.date]), "requestdate": $p.getControl(CLASS_REQUESTDATE).text(),
+                                "user": userName, "destination": row[FIELD_MAP.destination], "dep": row[FIELD_MAP.dep], "arr": row[FIELD_MAP.arr],
+                                "way": row[FIELD_MAP.way], "trip": row[FIELD_MAP.trip], "amount": row[FIELD_MAP.totalamount], "memo": row[FIELD_MAP.memo]
+                            });
+                        });
+                        //承認情報も入力
+                        var sendApprovalList = {};
+                        
                         //申請者(申請日入力済みか)
-                        if($p.getControl(CLASS_REQUESTDATE).text() !== ''){ //申請日項目だけプリザンター側で読み取り専用処理をしているためtextで取得
+                        if(/*$p.getControl(CLASS_REQUESTDATE).text() !== ''*/currentStatus !== STATUS_TEXT.creating && currentStatus !== STATUS_TEXT.reject){ //申請日項目だけプリザンター側で読み取り専用処理をしているためtextで取得
                             sendApprovalList.user = {
                                 "name": getUserName(CLASS_USER), // ★修正
-                                "date": $p.getControl(CLASS_REQUESTDATE).text()
+                                "date": $p.getControl(CLASS_REQUESTDATE).val()
                             };
                         }
                         //上長(上長承認日入力済みか)
-                        if($p.getControl(CLASS_SUPFIXDATE).val() !== ''){
+                        if(/*$p.getControl(CLASS_SUPFIXDATE).val() !== ''*/currentStatus !== STATUS_TEXT.creating && currentStatus !== STATUS_TEXT.reject && currentStatus !== STATUS_TEXT.approval){
                             sendApprovalList.superior = {
                                 "name": getUserName(CLASS_SUPERIOR), // ★修正
                                 "date": $p.getControl(CLASS_SUPFIXDATE).val()
                             };
                         }
                         //経理担当(経理決算日入力済みか)
-                        if($p.getControl(CLASS_ACCFIXDATE).val() !== ''){
+                        if(/*$p.getControl(CLASS_ACCFIXDATE).val() !== ''*/currentStatus !== STATUS_TEXT.creating 
+                        && currentStatus !== STATUS_TEXT.reject && currentStatus !== STATUS_TEXT.approval && currentStatus !== STATUS_TEXT.underrev){
                             sendApprovalList.accounting = {
                                 "name": getUserName(CLASS_ACCID), // ★修正
                                 "date": $p.getControl(CLASS_ACCFIXDATE).val()
                             };
                         }
                         //総務承認者(総務承認日入力済みか)
-                        if($p.getControl(CLASS_GAFIXDATE).val() !== ''){
+                        if(/*$p.getControl(CLASS_GAFIXDATE).val() !== ''*/currentStatus === STATUS_TEXT.underset || currentStatus === STATUS_TEXT.completed){ //総務承認日項目だけプリザンター側で読み取り専用処理をしているためtextで取得
                             sendApprovalList.generalaffair = {
                                 "name": getUserName(CLASS_GAID), // ★修正
                                 "date": $p.getControl(CLASS_GAFIXDATE).val()
