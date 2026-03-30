@@ -59,6 +59,7 @@ $p.events.on_editor_load = function () {
     const CLASS_GAFIXDATE = 'DateE';    //「承認日(総務部)」
     const CLASS_FIXDATE = 'DateD';      //「精算日」
     const CLASS_PAYWAY = 'ClassF';      //「精算方法」
+    const CLASS_ACCCHECK = 'CheckA';  // 「経理担当チェックボックス表示」項目
     const PAYWAY_INDIV = '個別支払';    //「精算方法」個別支払いの際のテキスト表記
 
     // const GA_DEPT_NAME = '総務管理部';
@@ -82,7 +83,8 @@ $p.events.on_editor_load = function () {
     }
 
     //「交通費精算レコード」テーブル
-    const TRAFREC_CLASS_DATANO = 'NumB'; //「清算書内データNo」欄
+    const TRAFREC_CLASS_DATANO = 'NumB';//「清算書内データNo」欄
+    const TRAFREC_CLASS_ACCCHECK = 'CheckA';   //「経理担当チェック」欄
     const FIELD_MAP = {
         date:        'StartTime',
         destination: 'Title',
@@ -739,6 +741,82 @@ $p.events.on_editor_load = function () {
             $('#MainCommands button').hide();
             $('#GoBack').show();
         }
+
+        //経理チェック欄表示制御
+        // const setupAccountingCheckboxes = () => {
+        //     // 1. 親テーブルの「経理表示オン/オフ」を取得
+        //     const isAccountingMode = String($p.getControl(CLASS_ACCCHECK).val()) === 'on';
+        //     //console.log("DEBUG: isAccountingMode: " + String($p.getControl(CLASS_ACCCHECK).val()) + " -> " + isAccountingMode);
+
+        //     // 2. リンクエリアのテーブル（画面下部の子一覧）から対象の列ヘッダーを探す
+        //     // ※プリザンターの仕様上、リンク一覧は #Listings 内のテーブルとして描画されます
+        //     const $childTableHeaders = $('#Listings th[data-name="' + TRAFREC_CLASS_ACCCHECK + '"]');
+
+        //     // 子テーブル側に該当項目が表示設定されていない場合は何もしない
+        //     let retryCount = 0; // リトライ回数をカウント
+        //     const MAX_RETRIES = 20; // 最大リトライ回数
+        //     if ($childTableHeaders.length === 0) {
+        //         retryCount++;
+        //         if (retryCount < MAX_RETRIES) {
+        //             setTimeout(setupAccountingCheckboxes, 100);
+        //         }
+        //         return; 
+        //     }
+        //     console.log("DEBUG: Found child table headers for accounting check: ", $childTableHeaders);
+
+        //     // 列のインデックス番号を取得（何列目か）
+        //     const colIndex = $childTableHeaders.index() + 1;
+
+        //     if (!isAccountingMode) {
+        //         // ---------------------------------------------------------
+        //         // パターンA：「経理表示」がオフの場合 -> 列ごと非表示にする
+        //         // ---------------------------------------------------------
+        //         // ヘッダーを隠す
+        //         $childTableHeaders.hide();
+        //         // 各行のセル（td）を隠す
+        //         $('#Listings tbody tr').each(function() {
+        //             $(this).find('td:nth-child(' + colIndex + ')').hide();
+        //         });
+
+        //     } else {
+        //         // ---------------------------------------------------------
+        //         // パターンB：「経理表示」がオンの場合 -> 操作可能なチェックボックスを埋め込む
+        //         // ---------------------------------------------------------
+        //         $('#Listings tbody tr').each(function() {
+        //             const $row = $(this);
+        //             const recordId = $row.attr('data-id'); // 子レコードのID（IssueId）を取得
+        //             const $targetCell = $row.find('td:nth-child(' + colIndex + ')');
+
+        //             if (recordId) {
+        //                 // 現在のチェック状態を判定（プリザンター標準のアイコン等から読み取る）
+        //                 // ※標準ではチェックが入っていると .ui-icon-check クラスのアイコンが出ます
+        //                 const isChecked = $targetCell.text().trim() === '〇' || $targetCell.find('.ui-icon-check').length > 0;
+
+        //                 // 実際の <input type="checkbox"> 要素を作成
+        //                 const $checkbox = $('<input>', {
+        //                     type: 'checkbox',
+        //                     class: 'accounting-checkbox', // 後でイベント登録するためのクラス
+        //                     'data-record-id': recordId,   // Ajax更新用にIDを仕込んでおく
+        //                     checked: isChecked
+        //                 });
+
+        //                 // 見栄えの調整（クリックしやすく少し大きくする）
+        //                 $checkbox.css({
+        //                     'transform': 'scale(1.5)',
+        //                     'cursor': 'pointer',
+        //                     'margin': '5px'
+        //                 });
+
+        //                 // セルの中身を空にして、作成したチェックボックスを投入
+        //                 $targetCell.empty().append($checkbox).css('text-align', 'center');
+        //             }
+        //         });
+        //     }
+        // };
+
+        // ▼ 処理をスタートさせる
+        //setupAccountingCheckboxes();
+
         //#endregion
 
         //#region<<PDFボタン>>
