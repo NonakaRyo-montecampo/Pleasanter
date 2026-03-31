@@ -60,6 +60,7 @@ $p.events.on_editor_load = function () {
     const CLASS_FIXDATE = 'DateD';      //「精算日」
     const CLASS_PAYWAY = 'ClassF';      //「精算方法」
     const CLASS_ACCCHECK = 'CheckA';  // 「経理担当チェックボックス表示」項目
+    const PARENT_CHECKED_LIST_COL = 'DescriptionA'; // チェックしたIDを保存する親のテキスト項目
     const PAYWAY_INDIV = '個別支払';    //「精算方法」個別支払いの際のテキスト表記
 
     // const GA_DEPT_NAME = '総務管理部';
@@ -68,6 +69,8 @@ $p.events.on_editor_load = function () {
 
     const LINK_COLUMN_NAME = 'ClassI'; 
     const PARENT_USER_COLUMN = 'ClassA'; 
+
+    const ACCFIXBTN_ID = 'Process_3'; //「決済(完了)」ボタンID
 
     // ステータスID定義
     // 現在のステータス取得
@@ -217,6 +220,7 @@ $p.events.on_editor_load = function () {
         }
         return true;
     };
+
     //#endregion
 
     //#region<UI構築関数>
@@ -301,10 +305,6 @@ $p.events.on_editor_load = function () {
                             [FIELD_MAP.arr]: r[HIST_FIELD_MAP.arr], 
                             [FIELD_MAP.way]: r[HIST_FIELD_MAP.way], 
                             [FIELD_MAP.amount]: r[HIST_FIELD_MAP.amount], 
-                            //以下子レコード内保存領域を持たないデータのため削除
-                            //ClassE: $p.getControl(CLASS_USER).val(), 
-                            //ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
-                            //ClassI: String($p.id()),
                             _mode: 'copy'
                         };
                         const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
@@ -539,15 +539,10 @@ $p.events.on_editor_load = function () {
                             if (res.StatusCode === 200 && res.Response.Data.length > 0) {
                                 const members = res.Response.Data[0].GroupMembers || [];
                                 const consist_in_group = members.filter(member => member.split(',').includes(String($p.userId())));
-                                // console.log("DEBUG: Read Group member data: "); //for debug
-                                // console.log(members);                           //for debug
-                                // console.log("DEBUG: Consist in Group: ");       //for debug
-                                // console.log(consist_in_group);                  //for debug
                                 const returnbool = consist_in_group.length > 0;
                                 sessionStorage.setItem(sessionkey, returnbool);
                                 resolve(returnbool);
                             } else {
-                                //console.log("DEBUG: Read Group ID: fail to read data, StatusCode: " + res.StatusCode);
                                 resolve(false);
                             }
                         }
@@ -742,80 +737,117 @@ $p.events.on_editor_load = function () {
             $('#GoBack').show();
         }
 
-        //経理チェック欄表示制御
-        // const setupAccountingCheckboxes = () => {
-        //     // 1. 親テーブルの「経理表示オン/オフ」を取得
-        //     const isAccountingMode = String($p.getControl(CLASS_ACCCHECK).val()) === 'on';
-        //     //console.log("DEBUG: isAccountingMode: " + String($p.getControl(CLASS_ACCCHECK).val()) + " -> " + isAccountingMode);
+        //#region<経理チェック欄表示制御>
+        let retryCount = 0; // リトライ回数をカウント
+        const MAX_RETRIES = 100; // 最大リトライ回数（例: 20回 -> 約2秒間）
+        const setupAccountingCheckboxes = () => {
+            // 1. グリッドのラッパー要素を探す
+            const gridWrap = document.querySelector('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
 
-        //     // 2. リンクエリアのテーブル（画面下部の子一覧）から対象の列ヘッダーを探す
-        //     // ※プリザンターの仕様上、リンク一覧は #Listings 内のテーブルとして描画されます
-        //     const $childTableHeaders = $('#Listings th[data-name="' + TRAFREC_CLASS_ACCCHECK + '"]');
+            if (!gridWrap) {
+                if (++retryCount < MAX_RETRIES) setTimeout(setupAccountingCheckboxes, 100);
+                return;
+            }
 
-        //     // 子テーブル側に該当項目が表示設定されていない場合は何もしない
-        //     let retryCount = 0; // リトライ回数をカウント
-        //     const MAX_RETRIES = 20; // 最大リトライ回数
-        //     if ($childTableHeaders.length === 0) {
-        //         retryCount++;
-        //         if (retryCount < MAX_RETRIES) {
-        //             setTimeout(setupAccountingCheckboxes, 100);
-        //         }
-        //         return; 
-        //     }
-        //     console.log("DEBUG: Found child table headers for accounting check: ", $childTableHeaders);
+            // 2. ラッパーの直下（Light DOM）からテーブルヘッダーと行を探す！
+            // ★ shadowRoot は使いません！
+            const th = gridWrap.querySelector(`th[data-name="${TRAFREC_CLASS_ACCCHECK}"]`);
+            const rows = gridWrap.querySelectorAll('tbody tr');
 
-        //     // 列のインデックス番号を取得（何列目か）
-        //     const colIndex = $childTableHeaders.index() + 1;
+            if (!th || rows.length === 0) {
+                if (++retryCount < MAX_RETRIES) setTimeout(setupAccountingCheckboxes, 100);
+                return;
+            }
 
-        //     if (!isAccountingMode) {
-        //         // ---------------------------------------------------------
-        //         // パターンA：「経理表示」がオフの場合 -> 列ごと非表示にする
-        //         // ---------------------------------------------------------
-        //         // ヘッダーを隠す
-        //         $childTableHeaders.hide();
-        //         // 各行のセル（td）を隠す
-        //         $('#Listings tbody tr').each(function() {
-        //             $(this).find('td:nth-child(' + colIndex + ')').hide();
-        //         });
+            
+            // 3. 表示/非表示とチェックボックスの描画
+            console.log("DEBUG: Found grid elements. Setting up accounting checkboxes. Accounting Mode: " + String($p.getValue(CLASS_ACCCHECK)));
+            const isAccountingMode = $p.getValue(CLASS_ACCCHECK);
+            
+            // th が何列目にあるか取得
+            const headers = Array.from(gridWrap.querySelectorAll('th'));
+            const colIndex = headers.indexOf(th);
 
-        //     } else {
-        //         // ---------------------------------------------------------
-        //         // パターンB：「経理表示」がオンの場合 -> 操作可能なチェックボックスを埋め込む
-        //         // ---------------------------------------------------------
-        //         $('#Listings tbody tr').each(function() {
-        //             const $row = $(this);
-        //             const recordId = $row.attr('data-id'); // 子レコードのID（IssueId）を取得
-        //             const $targetCell = $row.find('td:nth-child(' + colIndex + ')');
+            if (!isAccountingMode) {
+                // --- パターンA：非表示 ---
+                th.style.display = 'none';
+                rows.forEach(tr => {
+                    if (tr.children[colIndex]) tr.children[colIndex].style.display = 'none';
+                });
 
-        //             if (recordId) {
-        //                 // 現在のチェック状態を判定（プリザンター標準のアイコン等から読み取る）
-        //                 // ※標準ではチェックが入っていると .ui-icon-check クラスのアイコンが出ます
-        //                 const isChecked = $targetCell.text().trim() === '〇' || $targetCell.find('.ui-icon-check').length > 0;
+            } else {
+                // --- パターンB：チェックボックス描画 ---
+                let currentCheckedList = $p.getControl(PARENT_CHECKED_LIST_COL).val() || ",";
+                if (currentCheckedList === "") currentCheckedList = ",";
 
-        //                 // 実際の <input type="checkbox"> 要素を作成
-        //                 const $checkbox = $('<input>', {
-        //                     type: 'checkbox',
-        //                     class: 'accounting-checkbox', // 後でイベント登録するためのクラス
-        //                     'data-record-id': recordId,   // Ajax更新用にIDを仕込んでおく
-        //                     checked: isChecked
-        //                 });
+                rows.forEach(tr => {
+                    const recordId = tr.getAttribute('data-id');
+                    const targetCell = tr.children[colIndex];
 
-        //                 // 見栄えの調整（クリックしやすく少し大きくする）
-        //                 $checkbox.css({
-        //                     'transform': 'scale(1.5)',
-        //                     'cursor': 'pointer',
-        //                     'margin': '5px'
-        //                 });
+                    if (recordId && targetCell) {
+                        // すでにチェックボックス作成済みの場合はスキップ
+                        if(targetCell.querySelector('.accounting-checkbox')) return; 
 
-        //                 // セルの中身を空にして、作成したチェックボックスを投入
-        //                 $targetCell.empty().append($checkbox).css('text-align', 'center');
-        //             }
-        //         });
-        //     }
-        // };
+                        const isChecked = currentCheckedList.includes(',' + recordId + ',');
 
-        // ▼ 処理をスタートさせる
-        //setupAccountingCheckboxes();
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'accounting-checkbox';
+                        checkbox.setAttribute('data-record-id', recordId);
+                        checkbox.checked = isChecked;
+                        
+                        //経理担当以外は操作不可にする
+                        if (!isKeiriMember) {
+                            //checkbox.disabled = true; // クリック操作を無効化
+                            // 代わりに、クリックされても状態変化を強制キャンセルする
+                            checkbox.addEventListener('click', (e) => {
+                                e.preventDefault(); 
+                            });
+                            //checkbox.style.cursor = 'not-allowed'; // カーソルを「禁止マーク」にする
+                            //checkbox.style.setProperty('cursor', 'not-allowed', 'important');
+                        }
+
+                        checkbox.style.transform = 'scale(1.5)';
+                        checkbox.style.cursor = 'pointer';
+                        checkbox.style.margin = '5px';
+
+                        targetCell.innerHTML = '';
+                        targetCell.appendChild(checkbox);
+                        targetCell.style.textAlign = 'center';
+
+                        // このセル（td）がクリックされても、行の遷移イベントをブロックする
+                        targetCell.addEventListener('click', (e) => {
+                            e.stopPropagation(); // 遷移の波及をここで止める！
+                        });
+                    }
+                });
+
+                // 4. クリックイベントの登録（重複登録防止付き）
+                if (!gridWrap.dataset.hasEvent) {
+                    gridWrap.addEventListener('change', (e) => {
+                        if (e.target.classList.contains('accounting-checkbox')) {
+                            const recId = e.target.getAttribute('data-record-id');
+                            let list = $p.getControl(PARENT_CHECKED_LIST_COL).val() || ",";
+                            if (list === "") list = ",";
+
+                            if (e.target.checked) {
+                                if (!list.includes(',' + recId + ',')) list += recId + ',';
+                            } else {
+                                list = list.replace(',' + recId + ',', ',');
+                            }
+                            if (list === ",") list = "";
+                            
+                            $p.set($p.getControl(PARENT_CHECKED_LIST_COL), list);
+                            console.log("DEBUG: 保存用メモ更新 -> ", list);
+                        }
+                    });
+                    gridWrap.dataset.hasEvent = "true";
+                }
+            }
+        };
+
+        setupAccountingCheckboxes();
+        //#endregion
 
         //#endregion
 
@@ -948,6 +980,29 @@ $p.events.on_editor_load = function () {
         //#endregion
 
     })();
+
+    //#region< 「決済(完了)」ボタンを押した時専用チェック>　※多分使えない。$p.events.before_send_Process_3の指示ができないと思う
+    // $p.events.before_send_Process_3 = function () {
+        
+    //     const gridWrap = document.querySelector('#Issues_Source' + childTableId + 'Wrap');
+    //     if (!gridWrap) return true; // テーブルが無ければ通過させる
+
+    //     // 1. 全チェックボックスの数を取得
+    //     const allCheckboxes = gridWrap.querySelectorAll('.accounting-checkbox');
+    //     // 2. チェックが入っている数を取得
+    //     const checkedBoxes = gridWrap.querySelectorAll('.accounting-checkbox:checked');
+
+    //     // 明細が1件以上あり、かつ数が一致していない場合
+    //     if (allCheckboxes.length > 0 && allCheckboxes.length !== checkedBoxes.length) {
+    //         alert('【エラー】\n経理チェックが完了していない明細があるため、決済に進めません。');
+    //         return false; // ★ここで処理をキャンセル（画面は遷移せず、元のまま）
+    //     }
+
+    //     return true; // 全てチェックされていれば、そのまま決済処理へ進む
+    // };
+    //#endregion
+
+
     //#endregion
 
     //#region<自動入力系>
@@ -1034,20 +1089,11 @@ $p.events.on_editor_load = function () {
         // --- 判定ロジック ---
 
         if ($sender && ($sender.attr('id') === 'DeleteCommand' || $sender.attr('name') === 'Delete')) {
-            //console.log("DEBUG: Skip sort update (Delete button).");
             return true;
         }
-
         if (isChildUpdating) {
-            //console.log("DEBUG: Proceed to save (isChildUpdating = true).");
             return true;
         }
-
-        /*
-        if ($('#FieldSetGeneral').find('input').prop('readonly')) {
-            return true;
-        }
-        */
 
         // 4. 並び順の更新処理を開始
         (async () => {
@@ -1071,9 +1117,5 @@ $p.events.on_editor_load = function () {
     };
 
     setupSortableChildTable();
-    //#endregion
-
-    //#region<上長未記入で上長承認スキップ機能>
-
     //#endregion
 };
