@@ -796,7 +796,7 @@ $p.events.on_editor_load = function () {
                         checkbox.checked = isChecked;
                         
                         //経理担当以外、または決済待ちステータス時は操作不可にする
-                        if (!isKeiriMember/* || currentStatus !== STATUS_TEXT.underrev*/) {
+                        if (!isKeiriMember || currentStatus !== STATUS_TEXT.underrev) {
                             //checkbox.disabled = true; // クリック操作を無効化
                             // 代わりに、クリックされても状態変化を強制キャンセルする
                             checkbox.addEventListener('click', (e) => {
@@ -1121,8 +1121,7 @@ $p.events.on_editor_load = function () {
 
 //#region <決済プロセス実行前のチェック用関数（スクリプトタブに記載）>
 $p.ex.validateKeiriCheck = function() {
-    const childTableId = '15339887'; // 子テーブルのID
-    const gridWrap = document.querySelector('#Issues_Source' + childTableId + 'Wrap');
+    const gridWrap = document.querySelector('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
     
     if (!gridWrap) return true; // テーブルが無ければ通過させる
 
