@@ -750,7 +750,6 @@ $p.events.on_editor_load = function () {
             }
 
             // 2. ラッパーの直下（Light DOM）からテーブルヘッダーと行を探す！
-            // ★ shadowRoot は使いません！
             const th = gridWrap.querySelector(`th[data-name="${TRAFREC_CLASS_ACCCHECK}"]`);
             const rows = gridWrap.querySelectorAll('tbody tr');
 
@@ -796,8 +795,8 @@ $p.events.on_editor_load = function () {
                         checkbox.setAttribute('data-record-id', recordId);
                         checkbox.checked = isChecked;
                         
-                        //経理担当以外は操作不可にする
-                        if (!isKeiriMember) {
+                        //経理担当以外、または決済待ちステータス時は操作不可にする
+                        if (!isKeiriMember/* || currentStatus !== STATUS_TEXT.underrev*/) {
                             //checkbox.disabled = true; // クリック操作を無効化
                             // 代わりに、クリックされても状態変化を強制キャンセルする
                             checkbox.addEventListener('click', (e) => {
@@ -1119,3 +1118,23 @@ $p.events.on_editor_load = function () {
     setupSortableChildTable();
     //#endregion
 };
+
+//#region <決済プロセス実行前のチェック用関数（スクリプトタブに記載）>
+$p.ex.validateKeiriCheck = function() {
+    const childTableId = '15339887'; // 子テーブルのID
+    const gridWrap = document.querySelector('#Issues_Source' + childTableId + 'Wrap');
+    
+    if (!gridWrap) return true; // テーブルが無ければ通過させる
+
+    const allCheckboxes = gridWrap.querySelectorAll('.accounting-checkbox');
+    const checkedBoxes = gridWrap.querySelectorAll('.accounting-checkbox:checked');
+
+    // 明細が1件以上あり、かつチェック数が一致していない場合
+    if (allCheckboxes.length > 0 && allCheckboxes.length !== checkedBoxes.length) {
+        alert('【エラー】\n経理チェックが完了していない明細があるため、決済(完了)に進めません。');
+        return false; // NGを返す
+    }
+    
+    return true; // OKを返す
+};
+// #endregion
