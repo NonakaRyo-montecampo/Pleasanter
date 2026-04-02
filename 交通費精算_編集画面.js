@@ -514,6 +514,84 @@ $p.events.on_editor_load = function () {
             };
         }
         //#endregion
+    
+        //#region<<子レコード自動ソートボタン>>
+        if ($('#BtnRouteSort').length === 0) {
+            const sortBtnHtml = `<button id="BtnRouteSort" class="button button-icon ui-button ui-corner-all ui-widget" style="margin-left: 10px;"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-arrowthick-2-n-s"></span>日付順に並び替え</button>`;
+            
+            // OCRボタンの後ろ、またはターゲットボタンの最後に配置
+            // if ($('#BtnOcrRead').length > 0) {
+            //     $('#BtnOcrRead').after(sortBtnHtml);
+            // } else if($targetBtn.length > 0) {
+            //     let $visibleBtn = $targetBtn.filter(':visible');
+            //     if($visibleBtn.length > 0) $visibleBtn.last().after(sortBtnHtml);
+            //     else $targetBtn.last().after(sortBtnHtml);
+            // }
+            const $gridContainer = $('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
+            if ($gridContainer.length > 0) {
+                $gridContainer.after(sortBtnHtml);
+            }
+
+            $(document).on('click', '#BtnRouteSort', function(e) {
+                e.preventDefault();
+                
+                const gridWrap = document.querySelector('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
+                
+                if (!gridWrap) {
+                    alert('対象の明細テーブルが見つかりません。');
+                    return;
+                }
+
+                const tbody = gridWrap.querySelector('tbody');
+                if (!tbody) return;
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                if (rows.length <= 1) return;
+
+                const headers = Array.from(gridWrap.querySelectorAll('th'));
+                const idxDate = headers.findIndex(th => th.getAttribute('data-name') === FIELD_MAP.date); 
+                const idxDep  = headers.findIndex(th => th.getAttribute('data-name') === FIELD_MAP.dep); 
+                const idxArr  = headers.findIndex(th => th.getAttribute('data-name') === FIELD_MAP.arr); 
+
+                if (idxDate === -1 || idxDep === -1 || idxArr === -1) {
+                    alert('並び替えに失敗しました。');
+                    console.log('並び替えに必要な項目（日付, 出発, 到着）が一覧に表示されていません。');
+                    return;
+                }
+
+                const rowData = rows.map(tr => {
+                    return {
+                        element: tr,
+                        date: tr.children[idxDate].textContent.trim(),
+                        dep: tr.children[idxDep].textContent.trim(),
+                        arr: tr.children[idxArr].textContent.trim()
+                    };
+                });
+
+                rowData.sort((a, b) => {
+                    const cleanDateA = a.date.substring(0, 10);
+                    const cleanDateB = b.date.substring(0, 10);
+                    // ① まずは日付で比較
+                    const dateA = new Date(cleanDateA).getTime() || 0;
+                    const dateB = new Date(cleanDateB).getTime() || 0;
+                    if (dateA !== dateB) return dateA - dateB; // 昇順（古い順）
+
+                    // ② 日付が同じ場合：到着駅と出発駅の「しりとり」を確認
+                    // Aの到着駅 ＝ Bの出発駅 なら、Aを先にする (-1)
+                    if (a.arr !== "" && a.arr === b.dep) return -1;
+                    // Bの到着駅 ＝ Aの出発駅 なら、Bを先にする (1)
+                    if (b.arr !== "" && b.arr === a.dep) return 1;
+
+                    return 0; 
+                });
+
+                // 並び替えた順序でDOMを再構築
+                rowData.forEach(item => tbody.appendChild(item.element));
+                
+                // 変更をプリザンターに検知させる
+                gridWrap.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        }
+        //#endregion
     };
     //#endregion
 
