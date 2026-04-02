@@ -754,6 +754,7 @@ $p.events.on_editor_load = function () {
         //#endregion
 
         //#region<<権限毎の画面制御>>
+        //#region<<読み取り専用化処理>>
         //デフォルトで読み取り専用の項目を読み取り専用化    
         setReadOnlyStyle(CLASS_SUPFIXDATE);
         setReadOnlyStyle(CLASS_ACCFIXDATE);
@@ -814,8 +815,9 @@ $p.events.on_editor_load = function () {
             $('#MainCommands button').hide();
             $('#GoBack').show();
         }
+        //#endregion
 
-        //#region<経理チェック欄表示制御>
+        //#region<<経理チェック欄表示制御>>
         let retryCount = 0; // リトライ回数をカウント
         const MAX_RETRIES = 100; // 最大リトライ回数（例: 20回 -> 約2秒間）
         const setupAccountingCheckboxes = () => {
@@ -924,6 +926,36 @@ $p.events.on_editor_load = function () {
         };
 
         setupAccountingCheckboxes();
+        //#endregion
+
+        //#region<<子テーブル：標準の列タイトルクリック（ソート）を無効化する透明カーテン>>
+        let disableSortRetryCount = 0;
+        const MAX_DISABLE_SORT_RETRIES = 100;
+
+        const disableDefaultSort = () => {
+            const gridWrap = document.querySelector('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
+            
+            if (!gridWrap) {
+                //console.log("DEBUG: Waiting for grid to initialize for disabling default sort... disableSortRetryCount=" + disableSortRetryCount);
+                if (++disableSortRetryCount < MAX_DISABLE_SORT_RETRIES) setTimeout(disableDefaultSort, 100);
+                return;
+            }
+
+            // タイトル行（ヘッダー）を取得
+            const headerRow = gridWrap.querySelector('thead tr.ui-widget-header');
+            
+            if (headerRow) {
+                // 1. 透明カーテン（マウスイベントの完全無効化）を付与
+                headerRow.style.pointerEvents = 'none';
+                console.log("DEBUG: Default sorting disabled on child table.");
+            } else {
+                // テーブルの外枠はあるが中身がまだ描画されていない場合のリトライ
+                //console.log("DEBUG: Waiting for grid to visualize for disabling default sort... disableSortRetryCount=" + disableSortRetryCount);
+                if (++disableSortRetryCount < MAX_DISABLE_SORT_RETRIES) setTimeout(disableDefaultSort, 100);
+            }
+        };
+
+        disableDefaultSort();
         //#endregion
 
         //#endregion
