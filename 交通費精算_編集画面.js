@@ -2,12 +2,14 @@
 $p.events.on_editor_load = function () {
     //#region<使用環境毎の設定定数> ※新環境でこのスクリプトを導入する際は必ずここの定数に値を書き加えること。
     //===============================================================================================================================================
-
-    //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
-    const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
+    //以下@siteid list start以下はサイトパッケージエクスポートにて自動変換されるため手での修正不要
+    // @siteid list start@
     const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
     const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
     const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
+    // @siteid list end@
+    //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
+    const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
     //総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例権限用の変数。特に理由が無ければfalse推奨)
     const GeneralAffairs_editable = true;
 
@@ -131,6 +133,10 @@ $p.events.on_editor_load = function () {
 
     //sessionStorageキー
     const SESSION_KEY_ACC_EDITABLE = 'TrafficApp_GeneralAffairsEditable'
+
+    //追加実装ボタン
+    //--ここに追記--
+    //
 
     // =========================================================================
     // 指定項目読み取り専用化
@@ -840,7 +846,6 @@ $p.events.on_editor_load = function () {
 
             
             // 3. 表示/非表示とチェックボックスの描画
-            console.log("DEBUG: Found grid elements. Setting up accounting checkboxes. Accounting Mode: " + String($p.getValue(CLASS_ACCCHECK)));
             const isAccountingMode = $p.getValue(CLASS_ACCCHECK);
             
             // th が何列目にあるか取得
@@ -917,10 +922,57 @@ $p.events.on_editor_load = function () {
                             if (list === ",") list = "";
                             
                             $p.set($p.getControl(PARENT_CHECKED_LIST_COL), list);
-                            console.log("DEBUG: 保存用メモ更新 -> ", list);
+                            //console.log("DEBUG: 保存用メモ更新 -> ", list);
                         }
                     });
                     gridWrap.dataset.hasEvent = "true";
+                }
+
+                // 経理チェック一括ON/OFFボタン
+                if (isKeiriMember && currentStatus === STATUS_TEXT.underrev && $('#BtnCheckAllAccounting').length === 0) {
+                    const checkAllBtnHtml = `<button id="BtnCheckAllAccounting" class="button button-icon ui-button ui-corner-all ui-widget" style="margin-left: 10px; margin-bottom: 5px;"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-check"></span>経理一括ON/OFF</button>`;
+                    
+                    const $gridContainer = $('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
+                    if ($gridContainer.length > 0) {
+                        $gridContainer.after(checkAllBtnHtml);
+                    }
+
+                    // 一括クリック時の処理
+                    $(document).off('click', '#BtnCheckAllAccounting').on('click', '#BtnCheckAllAccounting', function(e) {
+                        e.preventDefault();
+                        
+                        const checkboxes = gridWrap.querySelectorAll('.accounting-checkbox');
+                        if (checkboxes.length === 0) return;
+
+                        // 現在、すべてチェックされているかを判定
+                        let isAllChecked = true;
+                        checkboxes.forEach(cb => { if (!cb.checked) isAllChecked = false; });
+
+                        // 保存用テキストを呼び出し
+                        let list = $p.getControl(PARENT_CHECKED_LIST_COL).val() || ",";
+                        if (list === "") list = ",";
+
+                        // チェックボックスの状態と保存用テキストを一括更新
+                        checkboxes.forEach(cb => {
+                            const recId = cb.getAttribute('data-record-id');
+                            if (isAllChecked) {
+                                // 全部ONなら、すべてOFFにする
+                                cb.checked = false;
+                                list = list.replace(',' + recId + ',', ',');
+                            } else {
+                                // 1つでもOFFがあれば、すべてONにする
+                                cb.checked = true;
+                                if (!list.includes(',' + recId + ',')) list += recId + ',';
+                            }
+                        });
+
+                        // カンマだけになっていたら空にする
+                        if (list === ",") list = "";
+                        
+                        // 親レコードの非表示項目に保存
+                        $p.set($p.getControl(PARENT_CHECKED_LIST_COL), list);
+                        //console.log("DEBUG: 一括操作による保存用テキスト更新 -> ", list);
+                    });
                 }
             }
         };
@@ -1051,7 +1103,7 @@ $p.events.on_editor_load = function () {
                         //精算完了(精算日入力済みか) ※給与組み込みの際は入力不要
                         if($p.getControl(CLASS_FIXDATE).text() !== '' && $p.getControl(CLASS_PAYWAY).text() === PAYWAY_INDIV){ //プリザンター側で読み取り専用処理をしているためtextで取得
                             sendApprovalList.settlement = {
-                                "name": getUserName(CLASS_ACCID), // ★修正
+                                "name": getUserName(CLASS_ACCID),
                                 "date": $p.getControl(CLASS_FIXDATE).text()
                             };
                         }
@@ -1060,10 +1112,6 @@ $p.events.on_editor_load = function () {
                             "records": sendDataList,
                             "approval": sendApprovalList
                         };
-
-                        //for debug
-                        // console.log("DEBUG: made payload for PDF.");
-                        // console.log(payload)
 
                         $.ajax({
                             type: 'POST', url: GAS_TRANSREPO_URL, contentType: 'text/plain', data: JSON.stringify(payload),
