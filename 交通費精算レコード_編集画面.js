@@ -4,9 +4,15 @@ $p.events.on_editor_load = function () {
     //===============================================================================================================================================
     //以下@siteid list start以下はサイトパッケージエクスポートにて自動変換されるため手での修正不要
     // @siteid list start@
-    const TRANSREPOTABLE_ID = 15466053; //交通費申請テーブルID
-    const FAV_TABLE_ID = 15951290;  //お気に入り経路テーブルID
-    const HIST_TABLE_ID = 15960204; // 履歴テーブルID
+    // 以下、クラウド版用ID
+    // const TRANSREPOTABLE_ID = 15466053; //交通費申請テーブルID
+    // const FAV_TABLE_ID = 15951290;  //お気に入り経路テーブルID
+    // const HIST_TABLE_ID = 15960204; // 履歴テーブルID
+
+    //以下オンプレミス版のID
+    const TRANSREPOTABLE_ID = 9;//交通費申請テーブルID
+    const FAV_TABLE_ID = 7;     //お気に入り経路テーブルID
+    const HIST_TABLE_ID = 8;    // 履歴テーブルID
     // @siteid list end@
     //===============================================================================================================================================
     //#endregion
@@ -291,7 +297,7 @@ $p.events.on_editor_load = function () {
 
         // 必須項目（出発・到着）が空なら履歴保存しない
         if (!newRecord.ClassA || !newRecord.ClassB) {
-            console.log("DEBUG: History skip (Required fields empty).");
+            console.log("LOG: History skip (Required fields empty).");
             return;
         }
 
@@ -321,7 +327,6 @@ $p.events.on_editor_load = function () {
 
         // --- 4. 重複データの削除（サーバー & 配列） ---
         if (duplicateIndex !== -1) {
-            console.log("DEBUG: Duplicate found at index " + duplicateIndex + ". Removing old record...");
             
             const oldRecord = historyList[duplicateIndex];
             const deleteId = oldRecord.IssueId || oldRecord.ResultId || oldRecord.Id;
@@ -387,7 +392,6 @@ $p.events.on_editor_load = function () {
                 data: historyList
             };
             sessionStorage.setItem(SESSION_KEY_HIST, JSON.stringify(saveObj));
-            console.log("DEBUG: History updated successfully.");
 
         } catch (e) {
             console.error("History add failed:", e);
@@ -479,8 +483,6 @@ $p.events.on_editor_load = function () {
 
     //更新ボタン制御
     $p.events.before_send = function (args) {
-        console.log('DEBUG: args:');
-        console.log(args);
 
         // 既存の処理があれば先に実行（並び替え処理など）
         if (originalBeforeSend && originalBeforeSend(args) === false) {
@@ -565,7 +567,6 @@ $p.events.on_editor_load = function () {
         (async () => {
             try {
                 const parentId = getParentId();
-                console.log("DEBUG: Retrieved ParentId = " + parentId); // デバッグ用
 
                 // 親レコード情報の取得が必要か判定
                 // (sessionStorageがない、または お気に入りコピー等の場合でも親情報は最新を取りたい)
@@ -696,7 +697,6 @@ $p.events.on_editor_load = function () {
                     // 新規作成画面：無条件で Max + 1
                     nextNum = maxNum + 1;
                     $p.set($p.getControl(CLASS_RECORDNO), nextNum);
-                    console.log("DEBUG(New): Set Number to " + nextNum);
 
                 } else {
                     // 編集画面(Edit)：重複チェックを行う
@@ -709,7 +709,6 @@ $p.events.on_editor_load = function () {
                     });
 
                     if (isDuplicate) {
-                        console.log("DEBUG(Edit): Duplicate detected! It's a COPY record.");
                         
                         // (1) 番号を最新に書き換える
                         nextNum = maxNum + 1;
@@ -734,8 +733,6 @@ $p.events.on_editor_load = function () {
                             alert('保存に失敗しました。');
                         }
                                         
-                    } else {
-                        console.log("DEBUG(Edit): No duplicate. Safe.");
                     }
                 }
             }

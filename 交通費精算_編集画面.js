@@ -4,9 +4,21 @@ $p.events.on_editor_load = function () {
     //===============================================================================================================================================
     //以下@siteid list start以下はサイトパッケージエクスポートにて自動変換されるため手での修正不要
     // @siteid list start@
-    const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
-    const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
-    const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
+    // 以下クラウド版用のID
+    // const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
+    // const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
+    // const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
+
+    // const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
+    // const GAAPP_GROUP_ID = 3304;    //「総務承認者」グループID
+
+    //以下オンプレミス版のID
+    const CHILD_TABLE_ID = 5;    //「交通費精算レコード」テーブルID
+    const FAV_TABLE_ID = 7;      //「お気に入り経路」テーブルID
+    const HIST_TABLE_ID = 8;     //「経路履歴」テーブルID    
+
+    const KEIRI_GROUP_ID = 2;    //「経理担当」グループID
+    const GAAPP_GROUP_ID = 3;    //「総務承認者」グループID
     // @siteid list end@
     //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
     const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
@@ -66,8 +78,6 @@ $p.events.on_editor_load = function () {
     const PAYWAY_INDIV = '個別支払';    //「精算方法」個別支払いの際のテキスト表記
 
     // const GA_DEPT_NAME = '総務管理部';
-    const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
-    const GAAPP_GROUP_ID = 3304;    //「総務承認者」グループID
 
     const LINK_COLUMN_NAME = 'ClassI'; 
     const PARENT_USER_COLUMN = 'ClassA'; 
@@ -210,11 +220,9 @@ $p.events.on_editor_load = function () {
         });
 
         if (needUpdate) {
-            console.log("DEBUG: Updating child order...");
             $('#MainContainer').css('opacity', '0.5'); // 処理中表示
             try {
                 await Promise.all(updatePromises);
-                console.log("DEBUG: Child order updated.");
                 return true;
             } catch (e) {
                 console.error("並び替え更新エラー", e);
@@ -711,11 +719,11 @@ $p.events.on_editor_load = function () {
         const isStatusSettling = (st === STATUS_TEXT.underset);
         const isStatusCompleted = (st === STATUS_TEXT.completed); 
 
-        console.log(`=== Access Control (User ID Mode) ===`);
-        console.log(`Me: ${currentUserId}`);
-        console.log(`Target -> App: "${applicantId}", Sup: "${superiorId}"`);
-        console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isKeiriMember}`);
-        console.log(`=====================================`);
+        // console.log(`=== Access Control (User ID Mode) ===`);
+        // console.log(`Me: ${currentUserId}`);
+        // console.log(`Target -> App: "${applicantId}", Sup: "${superiorId}"`);
+        // console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isKeiriMember}`);
+        // console.log(`=====================================`);
 
         // 3. 権限付与ロジック
         let allowEditFields = false; 
@@ -988,7 +996,6 @@ $p.events.on_editor_load = function () {
             const gridWrap = document.querySelector('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
             
             if (!gridWrap) {
-                //console.log("DEBUG: Waiting for grid to initialize for disabling default sort... disableSortRetryCount=" + disableSortRetryCount);
                 if (++disableSortRetryCount < MAX_DISABLE_SORT_RETRIES) setTimeout(disableDefaultSort, 100);
                 return;
             }
@@ -1002,7 +1009,6 @@ $p.events.on_editor_load = function () {
                 console.log("DEBUG: Default sorting disabled on child table.");
             } else {
                 // テーブルの外枠はあるが中身がまだ描画されていない場合のリトライ
-                //console.log("DEBUG: Waiting for grid to visualize for disabling default sort... disableSortRetryCount=" + disableSortRetryCount);
                 if (++disableSortRetryCount < MAX_DISABLE_SORT_RETRIES) setTimeout(disableDefaultSort, 100);
             }
         };
@@ -1241,7 +1247,6 @@ $p.events.on_editor_load = function () {
             $sender = $('#UpdateCommand');
         }
 
-        console.log("DEBUG: Sender identified as -> " + ($sender ? $sender.attr('id') : 'Unknown'));
 
         // --- 判定ロジック ---
 
@@ -1255,7 +1260,6 @@ $p.events.on_editor_load = function () {
         // 4. 並び順の更新処理を開始
         (async () => {
             try {
-                console.log("DEBUG: Start to save record update.");
                 // 共通関数を使って更新
                 await updateChildOrder();
 
