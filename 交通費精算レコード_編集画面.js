@@ -8,11 +8,13 @@ $p.events.on_editor_load = function () {
     // const TRANSREPOTABLE_ID = 15466053; //交通費申請テーブルID
     // const FAV_TABLE_ID = 15951290;  //お気に入り経路テーブルID
     // const HIST_TABLE_ID = 15960204; // 履歴テーブルID
+    // const URL_PASS = '/fs';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
 
     //以下オンプレミス版のID
     const TRANSREPOTABLE_ID = 9;//交通費申請テーブルID
     const FAV_TABLE_ID = 7;     //お気に入り経路テーブルID
     const HIST_TABLE_ID = 8;    // 履歴テーブルID
+    const URL_PASS = '';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
     // @siteid list end@
     //===============================================================================================================================================
     //#endregion
@@ -341,15 +343,20 @@ $p.events.on_editor_load = function () {
 
         // --- 5. 新規レコードをサーバーに登録 ---
         try {
-            // $p.apiCreate 用データ（フラット構造）
             const apiData = {
                 Title:  newRecord.Title,
-                DateA:  newRecord.DateA,
-                ClassA: newRecord.ClassA,
-                ClassB: newRecord.ClassB,
-                ClassC: newRecord.ClassC,
-                ClassD: newRecord.ClassD,
-                NumA:   newRecord.NumA,
+                DateHash: {
+                    DateA:  newRecord.DateA
+                },
+                ClassHash: {
+                    ClassA: newRecord.ClassA,
+                    ClassB: newRecord.ClassB,
+                    ClassC: newRecord.ClassC,
+                    ClassD: newRecord.ClassD
+                },
+                NumHash: {
+                    NumA:   newRecord.NumA
+                },
                 Body:   newRecord.Body
             };
 
@@ -542,7 +549,7 @@ $p.events.on_editor_load = function () {
                     $('#MainCommands').append('<button id="GoBackBlocked" class="button button-icon ui-button ui-corner-all ui-widget">戻る</button>');
                     $('#GoBackBlocked').on('click', function(e){
                         e.preventDefault();
-                        window.location.href = '/fs/Items/' + parentId;
+                        window.location.href = URL_PASS + '/Items/' + parentId;
                     });
 
                     $('input, select, textarea, button').prop('disabled', true);
@@ -765,7 +772,7 @@ $p.events.on_editor_load = function () {
 
         // 遷移先URLの決定
         // 親IDがあれば親レコード編集画面へ、なければサイトトップ（一覧）へ
-        const targetUrl = parentId ? '/fs/Items/' + parentId : '/fs/Items/' + $p.siteId();
+        const targetUrl = parentId ? URL_PASS + '/Items/' + parentId : URL_PASS + '/Items/' + $p.siteId();
 
         // セッションゴミ掃除（念のため）
         sessionStorage.removeItem('TrafficApp_CopyData');
@@ -806,7 +813,7 @@ $p.events.on_editor_load = function () {
                 sessionStorage.removeItem('TrafficApp_OcrQueue');
                 sessionStorage.removeItem('TrafficApp_CopyData');
                 const parentId = getParentId();
-                const targetUrl = parentId ? '/fs/Items/' + parentId : '/fs/Items/' + $p.siteId();
+                const targetUrl = parentId ? URL_PASS + '/Items/' + parentId : URL_PASS + '/Items/' + $p.siteId();
                 window.location.href = targetUrl;
             }
         });
@@ -893,7 +900,6 @@ $p.events.on_editor_load = function () {
             // 経路履歴への登録処理（保存成功後に行う）
             // エラーになってもメイン処理は止めないよう catch する、または関数内で catch 済み
             await addToHistoryAsync();
-            
             // 遷移先決定ロジック
             let targetUrl = '';
             
@@ -910,19 +916,19 @@ $p.events.on_editor_load = function () {
                     sessionStorage.setItem('TrafficApp_OcrQueue', JSON.stringify(ocrQueue));
                     
                     // 4. 新規作成画面をリロード（新しい初期値で表示される）
-                    targetUrl = '/fs/Items/' + $p.siteId() + '/New?' + COL_LINK_TRANSREPO + '=' + safeParentId;
+                    targetUrl = URL_PASS + '/Items/' + $p.siteId() + '/New?' + COL_LINK_TRANSREPO + '=' + safeParentId;
                 
                 } else {
                     // 5. キューが空になったら完了
                     sessionStorage.removeItem('TrafficApp_OcrQueue'); // 掃除
                     alert("すべての読み取りデータの登録が完了しました。");
-                    targetUrl = '/fs/Items/' + safeParentId; // 親画面へ
+                    targetUrl = URL_PASS + '/Items/' + safeParentId; // 親画面へ
                 }
 
             } else if (mode === 'next') {
-                targetUrl = '/fs/Items/' + $p.siteId() + '/New?' + COL_LINK_TRANSREPO + '=' + safeParentId;
+                targetUrl = URL_PASS + '/Items/' + $p.siteId() + '/New?' + COL_LINK_TRANSREPO + '=' + safeParentId;
             } else {
-                targetUrl = '/fs/Items/' + (safeParentId || $p.siteId());
+                targetUrl = URL_PASS + '/Items/' + (safeParentId || $p.siteId());
             }
 
             $(window).off('beforeunload');

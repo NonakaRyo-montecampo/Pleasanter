@@ -12,13 +12,17 @@ $p.events.on_editor_load = function () {
     // const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
     // const GAAPP_GROUP_ID = 3304;    //「総務承認者」グループID
 
+    // const URL_PASS = '/fs';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
+
     //以下オンプレミス版のID
     const CHILD_TABLE_ID = 5;    //「交通費精算レコード」テーブルID
     const FAV_TABLE_ID = 7;      //「お気に入り経路」テーブルID
-    const HIST_TABLE_ID = 8;     //「経路履歴」テーブルID    
+    const HIST_TABLE_ID = 8;     //「経路履歴」テーブルID
 
     const KEIRI_GROUP_ID = 2;    //「経理担当」グループID
     const GAAPP_GROUP_ID = 3;    //「総務承認者」グループID
+
+    const URL_PASS = '';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
     // @siteid list end@
     //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
     const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
@@ -242,9 +246,8 @@ $p.events.on_editor_load = function () {
         if ($targetBtn.length === 0) return;
 
         //#region<<経路選択パネル>>
-        // --- 1. 経路選択パネル ---
         if ($('#CustomRouteContainer').length === 0) {
-            let cachedFavRecords = null;
+            //#region<<<経路履歴>>>
             const panelHtml = `
                 <div id="CustomRouteContainer" style="clear: both; margin-top: 20px;">
                     <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; color: #333; cursor: pointer; user-select: none;">
@@ -312,17 +315,17 @@ $p.events.on_editor_load = function () {
                     let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px;"></th><th>日付</th><th>行先</th><th>経路</th><th>金額</th><th>備考</th></tr></thead><tbody>';
                     const limit = 5;
                     historyList.slice(0, limit).forEach(r => {
-                        const routeDesc = (r[HIST_FIELD_MAP.dep] || '') + ' → ' + (r[HIST_FIELD_MAP.arr] || '') + ' <span style="color:#666;">(' + (r[HIST_FIELD_MAP.way] || '-') + ')</span>'; 
+                        const routeDesc = (r['ClassHash'][HIST_FIELD_MAP.dep] || '') + ' → ' + (r['ClassHash'][HIST_FIELD_MAP.arr] || '') + ' <span style="color:#666;">(' + (r['ClassHash'][HIST_FIELD_MAP.way] || '-') + ')</span>'; 
                         const copyData = {
                             [FIELD_MAP.destination]: r[HIST_FIELD_MAP.destination], 
-                            [FIELD_MAP.dep]: r[HIST_FIELD_MAP.dep], 
-                            [FIELD_MAP.arr]: r[HIST_FIELD_MAP.arr], 
-                            [FIELD_MAP.way]: r[HIST_FIELD_MAP.way], 
-                            [FIELD_MAP.amount]: r[HIST_FIELD_MAP.amount], 
+                            [FIELD_MAP.dep]: r['ClassHash'][HIST_FIELD_MAP.dep], 
+                            [FIELD_MAP.arr]: r['ClassHash'][HIST_FIELD_MAP.arr], 
+                            [FIELD_MAP.way]: r['ClassHash'][HIST_FIELD_MAP.way], 
+                            [FIELD_MAP.amount]: r['NumHash'][HIST_FIELD_MAP.amount], 
                             _mode: 'copy'
                         };
                         const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
-                        let dateStr = r[HIST_REGISTDATE] ? new Date(r[HIST_REGISTDATE]).toLocaleDateString() : '-';
+                        let dateStr = r['DateHash'][HIST_REGISTDATE] ? new Date(r['DateHash'][HIST_REGISTDATE]).toLocaleDateString() : '-';
                         tableHtml += 
                         `<tr style="border-bottom:1px solid #eee;">
                             <td style="text-align:center; padding: 5px;">
@@ -332,7 +335,7 @@ $p.events.on_editor_load = function () {
                             <td style="padding: 5px;">${dateStr}</td>
                             <td style="padding: 5px;">${r[HIST_FIELD_MAP.destination]}</td>
                             <td style="padding: 5px;">${routeDesc}</td>
-                            <td style="text-align:right; padding: 5px;">${(r[HIST_FIELD_MAP.amount] || 0).toLocaleString() + "円"}</td>
+                            <td style="text-align:right; padding: 5px;">${(r['NumHash'][HIST_FIELD_MAP.amount] || 0).toLocaleString() + "円"}</td>
                             <td style="padding: 5px;">${r[HIST_MEMO] || ''}</td>
                         </tr>`;
                     });
@@ -340,7 +343,10 @@ $p.events.on_editor_load = function () {
                     $histContainer.html(tableHtml);
                 }
             };
+            //#endregion
 
+            //#region<<<お気に入り経路>>>
+            let cachedFavRecords = null;
             const renderFavPage = (page) => {
                 const $favContainer = $('#tab-fav');
                 if (!cachedFavRecords || cachedFavRecords.length === 0) {
@@ -353,25 +359,22 @@ $p.events.on_editor_load = function () {
                 if (page > totalPages) page = totalPages; if (page < 1) page = 1;
                 const startIndex = (page - 1) * limit;
                 const displayRecords = cachedFavRecords.slice(startIndex, startIndex + limit);
+                console.log(`DEBUG: お気に入り経路表示 - Page ${page}/${totalPages}`, displayRecords);
 
                 let tableHtml = 
                 '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px; padding:5px;"></th><th style="padding:5px;">名称</th><th style="padding:5px;">行先</th><th style="padding:5px;">経路</th><th style="width:80px; padding:5px;">金額</th><th style="width:30px; padding:5px;"></th></tr></thead><tbody>';
 
                 displayRecords.forEach(r => {
                     const recordId = r.IssueId || r.ResultId || r.Id;
-                    const routeDesc = (r[FAV_FIELD_MAP.dep] || '') + ' → ' + (r[FAV_FIELD_MAP.arr] || '') + ' <span style="color:#666;">(' + (r[FAV_FIELD_MAP.way] || '-') + ')</span>';
+                    const routeDesc = (r['ClassHash'][FAV_FIELD_MAP.dep] || '') + ' → ' + (r['ClassHash'][FAV_FIELD_MAP.arr] || '') + ' <span style="color:#666;">(' + (r['ClassHash'][FAV_FIELD_MAP.way] || '-') + ')</span>';
                     //子レコードへのコピー用データ作成(お気に入り経路欄→子レコード欄への変換)
                     const copyData = { 
-                        [FIELD_MAP.destination] : r[FAV_FIELD_MAP.destination], 
-                        [FIELD_MAP.dep]: r[FAV_FIELD_MAP.dep], 
-                        [FIELD_MAP.arr]: r[FAV_FIELD_MAP.arr], 
-                        [FIELD_MAP.way]: r[FAV_FIELD_MAP.way], 
-                        [FIELD_MAP.amount]: r[FAV_FIELD_MAP.amount], 
-                        [FIELD_MAP.memo]: r[FAV_FIELD_MAP.memo], 
-                        //以下子レコード内保存領域を持たないデータのため削除
-                        //ClassE: $p.getControl(CLASS_USER).val(), 
-                        //ClassC: $p.getControl(CLASS_SUPERIOR).val(), 
-                        //ClassI: String($p.id()), 
+                        [FIELD_MAP.destination] : r['ClassHash'][FAV_FIELD_MAP.destination], 
+                        [FIELD_MAP.dep]: r['ClassHash'][FAV_FIELD_MAP.dep], 
+                        [FIELD_MAP.arr]: r['ClassHash'][FAV_FIELD_MAP.arr], 
+                        [FIELD_MAP.way]: r['ClassHash'][FAV_FIELD_MAP.way], 
+                        [FIELD_MAP.amount]: r['NumHash'][FAV_FIELD_MAP.amount], 
+                        [FIELD_MAP.memo]: r['ClassHash'][FAV_FIELD_MAP.memo], 
                         _mode: 'copy' 
                     };
                     const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
@@ -382,9 +385,9 @@ $p.events.on_editor_load = function () {
                             style="padding:2px 8px; font-size:11px; white-space: nowrap;" data-json="${jsonStr}">選択</button>
                         </td>
                         <td style="padding: 5px;">${r[FAV_CLASS_NAME]}</td>
-                        <td style="padding: 5px;">${r[FAV_FIELD_MAP.destination]}</td>
+                        <td style="padding: 5px;">${r['ClassHash'][FAV_FIELD_MAP.destination]}</td>
                         <td style="padding: 5px;">${routeDesc}</td>
-                        <td style="text-align:right; padding: 5px;">${(r[FAV_FIELD_MAP.amount] || 0).toLocaleString()  + "円"}</td>
+                        <td style="text-align:right; padding: 5px;">${(r['NumHash'][FAV_FIELD_MAP.amount] || 0).toLocaleString()  + "円"}</td>
                         <td style="text-align:center; padding: 5px;">
                             <button type="button" class="delete-fav-btn ui-button ui-corner-all ui-widget" style="padding: 1px 6px; font-size: 11px; color: white; 
                             background-color: #d9534f; border: 1px solid #d43f3a; border-radius: 3px;" title="削除" data-id="${recordId}" data-page="${page}">×</button>
@@ -407,7 +410,13 @@ $p.events.on_editor_load = function () {
                 try {
                     const result = await apiGetAsync({
                         id: FAV_TABLE_ID,
-                        data: { View: { ColumnFilterHash: { [FAV_USER_COL]: JSON.stringify([String($p.userId())]) }, ColumnSorterHash: { UpdatedTime: 'desc' } }, PageSize: 1000 }
+                        data: { 
+                            View: { 
+                                ColumnFilterHash: { [FAV_USER_COL]: JSON.stringify([String($p.userId())]) }, 
+                                ColumnSorterHash: { UpdatedTime: 'desc' } 
+                            }, 
+                            PageSize: 1000 
+                        }
                     });
                     cachedFavRecords = result.Response.Data || [];
                     renderFavPage(1);
@@ -419,6 +428,7 @@ $p.events.on_editor_load = function () {
             $('#RouteTabs').tabs({
                 activate: function(event, ui) {
                     const panelId = ui.newPanel.attr('id');
+                    // console.log("DEBUG: お気に入り経路データ有無確認", "null" ? cachedFavRecords : cachedFavRecords);
                     if (panelId === 'tab-history') loadHistoryData();
                     else if (panelId === 'tab-fav') { if (cachedFavRecords === null) fetchAllFavData(); else renderFavPage(1); }
                 }
@@ -449,8 +459,9 @@ $p.events.on_editor_load = function () {
                 const data = $(this).data('json');
                 data.ParentId = $p.id();
                 sessionStorage.setItem('TrafficApp_CopyData', JSON.stringify(data));
-                window.location.href = '/fs/Items/' + CHILD_TABLE_ID + '/New?' + LINK_COLUMN_NAME + '=' + data.ParentId;
+                window.location.href = URL_PASS + '/Items/' + CHILD_TABLE_ID + '/New?' + LINK_COLUMN_NAME + '=' + data.ParentId;
             });
+            //#endregion
         }
         //#endregion
 
@@ -524,7 +535,7 @@ $p.events.on_editor_load = function () {
                 const firstData = queue.shift();
                 sessionStorage.setItem('TrafficApp_OcrQueue', JSON.stringify(queue));
                 sessionStorage.setItem('TrafficApp_CopyData', JSON.stringify(firstData));
-                window.location.href = '/fs/Items/' + CHILD_TABLE_ID + '/New?' + (typeof LINK_COLUMN_NAME !== 'undefined' ? LINK_COLUMN_NAME : 'ClassI') + '=' + parentId;
+                window.location.href = URL_PASS + '/Items/' + CHILD_TABLE_ID + '/New?' + (typeof LINK_COLUMN_NAME !== 'undefined' ? LINK_COLUMN_NAME : 'ClassI') + '=' + parentId;
             };
         }
         //#endregion
@@ -532,15 +543,7 @@ $p.events.on_editor_load = function () {
         //#region<<子レコード自動ソートボタン>>
         if ($('#BtnRouteSort').length === 0) {
             const sortBtnHtml = `<button id="BtnRouteSort" class="button button-icon ui-button ui-corner-all ui-widget" style="margin-left: 10px;"><span class="ui-button-icon-left ui-icon ui-checkboxradio-icon ui-icon-arrowthick-2-n-s"></span>日付順に並び替え</button>`;
-            
-            // OCRボタンの後ろ、またはターゲットボタンの最後に配置
-            // if ($('#BtnOcrRead').length > 0) {
-            //     $('#BtnOcrRead').after(sortBtnHtml);
-            // } else if($targetBtn.length > 0) {
-            //     let $visibleBtn = $targetBtn.filter(':visible');
-            //     if($visibleBtn.length > 0) $visibleBtn.last().after(sortBtnHtml);
-            //     else $targetBtn.last().after(sortBtnHtml);
-            // }
+
             const $gridContainer = $('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
             if ($gridContainer.length > 0) {
                 $gridContainer.after(sortBtnHtml);
@@ -1006,7 +1009,6 @@ $p.events.on_editor_load = function () {
             if (headerRow) {
                 // 1. 透明カーテン（マウスイベントの完全無効化）を付与
                 headerRow.style.pointerEvents = 'none';
-                console.log("DEBUG: Default sorting disabled on child table.");
             } else {
                 // テーブルの外枠はあるが中身がまだ描画されていない場合のリトライ
                 if (++disableSortRetryCount < MAX_DISABLE_SORT_RETRIES) setTimeout(disableDefaultSort, 100);
