@@ -525,6 +525,7 @@ $p.events.on_editor_load = function () {
 
             if (result.Response.Data.length > 0) {
                 const parentRecord = result.Response.Data[0];
+                //console.log("DEBUG: Parent record fetched successfully.", result); // for debugging
                 // API経由だとステータスは「ID(数値)」で返ってきます (例: 100)
                 const pStatusId = parentRecord.Status; 
 
@@ -534,11 +535,11 @@ $p.events.on_editor_load = function () {
                 //総務部編集可能であればsessionStorageから読み取り
                 const SESSION_KEY_GA_EDITABLE = 'TrafficApp_GeneralAffairsEditable'
                 const gaEditableId = sessionStorage.getItem(SESSION_KEY_GA_EDITABLE);
-
+                
                 if(String(gaEditableId) === String($p.userId())){
 
                 }
-                else if (!ALLOWED_STATUS_IDS.includes(pStatusId) || String(parentRecord[TRANSREPOTABLE_CLASS_CREATOR]) !== String($p.userId())) {
+                else if (!ALLOWED_STATUS_IDS.includes(pStatusId) || String(parentRecord["ClassHash"][TRANSREPOTABLE_CLASS_CREATOR]) !== String($p.userId())) {
                     console.log("Block Edit: Parent status ID is " + pStatusId);
                     
                     // アラート表示
@@ -687,7 +688,7 @@ $p.events.on_editor_load = function () {
                 // 2. 最大値を計算
                 if (records.length > 0) {
                     let numList = records.map(r => {
-                        let n = parseFloat(r[CLASS_RECORDNO]);
+                        let n = parseFloat(r['NumHash'][CLASS_RECORDNO]);
                         return isNaN(n) ? 0 : n;
                     });
                     maxNum = Math.max(...numList);
@@ -712,7 +713,7 @@ $p.events.on_editor_load = function () {
                     
                     let isDuplicate = records.some(function(r) {
                         // 文字列比較でIDが違う かつ 番号が同じものがあるか
-                        return (String(r.IssueId) !== String(myId)) && (parseFloat(r[CLASS_RECORDNO]) === currentVal);
+                        return (String(r.IssueId) !== String(myId)) && (parseFloat(r['NumHash'][CLASS_RECORDNO]) === currentVal);
                     });
 
                     if (isDuplicate) {

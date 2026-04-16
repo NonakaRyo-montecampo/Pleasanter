@@ -1,43 +1,45 @@
 // 交通費申請　編集画面
+
+//#region<使用環境毎の設定定数> ※新環境でこのスクリプトを導入する際は必ずここの定数に値を書き加えること。
+//===============================================================================================================================================
+//以下@siteid list start以下はサイトパッケージエクスポートにて自動変換されるため手での修正不要
+// @siteid list start@
+// 以下クラウド版用のID
+// const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
+// const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
+// const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
+
+// const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
+// const GAAPP_GROUP_ID = 3304;    //「総務承認者」グループID
+
+// const URL_PASS = '/fs';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
+
+//以下オンプレミス版のID
+const CHILD_TABLE_ID = 5;    //「交通費精算レコード」テーブルID
+const FAV_TABLE_ID = 7;      //「お気に入り経路」テーブルID
+const HIST_TABLE_ID = 8;     //「経路履歴」テーブルID
+
+const KEIRI_GROUP_ID = 2;    //「経理担当」グループID
+const GAAPP_GROUP_ID = 3;    //「総務承認者」グループID
+
+const URL_PASS = '';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
+// @siteid list end@
+//GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
+const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
+//総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例権限用の変数。特に理由が無ければfalse推奨)
+const GeneralAffairs_editable = true;
+
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+// ★変数ではないが、以下一覧画面用のスクリプトを実装する必要あり。(一覧画面の削除ボタン非表示化) 
+// ★「テーブル管理」>「スクリプト」から「新規作成」を選択し、スクリプト部に以下のコマンドを記載。
+// ★　$('#BulkDeleteCommand').hide();                                                      
+// ★その後、チェックボックスを「一覧」のみ選択し、保存する。                                   
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+//===============================================================================================================================================
+//#endregion
+
 $p.events.on_editor_load = function () {
-    //#region<使用環境毎の設定定数> ※新環境でこのスクリプトを導入する際は必ずここの定数に値を書き加えること。
-    //===============================================================================================================================================
-    //以下@siteid list start以下はサイトパッケージエクスポートにて自動変換されるため手での修正不要
-    // @siteid list start@
-    // 以下クラウド版用のID
-    // const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
-    // const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
-    // const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
-
-    // const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
-    // const GAAPP_GROUP_ID = 3304;    //「総務承認者」グループID
-
-    // const URL_PASS = '/fs';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
-
-    //以下オンプレミス版のID
-    const CHILD_TABLE_ID = 5;    //「交通費精算レコード」テーブルID
-    const FAV_TABLE_ID = 7;      //「お気に入り経路」テーブルID
-    const HIST_TABLE_ID = 8;     //「経路履歴」テーブルID
-
-    const KEIRI_GROUP_ID = 2;    //「経理担当」グループID
-    const GAAPP_GROUP_ID = 3;    //「総務承認者」グループID
-
-    const URL_PASS = '';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
-    // @siteid list end@
-    //GAS(駅すぱあとAPI及びGemini API使用用の踏み台スクリプト)のAPI URL
-    const GAS_TRANSREPO_URL = 'https://script.google.com/macros/s/AKfycbwv_UdDOkIvyVcz_oAj-1odo4yEWD013cKTs4u3bxXhB0qPvWwS_qAE-ZyKL4SQDh_Q/exec';
-    //総務管理部の編集権限(trueの場合、常に総務部は編集権限を持つ。montecampo社内運用特例権限用の変数。特に理由が無ければfalse推奨)
-    const GeneralAffairs_editable = true;
-
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★変数ではないが、以下一覧画面用のスクリプトを実装する必要あり。(一覧画面の削除ボタン非表示化) 
-    // ★「テーブル管理」>「スクリプト」から「新規作成」を選択し、スクリプト部に以下のコマンドを記載。
-    // ★　$('#BulkDeleteCommand').hide();                                                      
-    // ★その後、チェックボックスを「一覧」のみ選択し、保存する。                                   
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
-    //===============================================================================================================================================
-    //#endregion
 
     //#region<標準の離脱警告ポップアップ無効化>
     // =========================================================================
@@ -77,7 +79,7 @@ $p.events.on_editor_load = function () {
     const CLASS_GAFIXDATE = 'DateE';    //「承認日(総務部)」
     const CLASS_FIXDATE = 'DateD';      //「精算日」
     const CLASS_PAYWAY = 'ClassF';      //「精算方法」
-    const CLASS_ACCCHECK = 'CheckA';  // 「経理担当チェックボックス表示」項目
+    const CLASS_ACCCHECK = 'CheckA';    // 「経理担当チェックボックス表示」項目
     const PARENT_CHECKED_LIST_COL = 'DescriptionA'; // チェックしたIDを保存する親のテキスト項目
     const PAYWAY_INDIV = '個別支払';    //「精算方法」個別支払いの際のテキスト表記
 
@@ -1055,6 +1057,7 @@ $p.events.on_editor_load = function () {
                         });
                         var records = result.Response.Data;
                         if (records.length === 0) { alert('データがありません。'); return; }
+                        console.log("DEBUG: 取得した明細データ -> ", records);
 
                         // 💡 ヘルパー関数: ユーザー項目の「表示名（名前）」を確実に取得する
                         const getUserName = (classId) => {
@@ -1072,10 +1075,11 @@ $p.events.on_editor_load = function () {
                         records.forEach(function(row) {
                             sendDataList.push({
                                 "id": row.IssueId, "date": formatDate(row[FIELD_MAP.date]), "requestdate": $p.getControl(CLASS_REQUESTDATE).text(),
-                                "user": userName, "destination": row[FIELD_MAP.destination], "dep": row[FIELD_MAP.dep], "arr": row[FIELD_MAP.arr],
-                                "way": row[FIELD_MAP.way], "trip": row[FIELD_MAP.trip], "amount": row[FIELD_MAP.totalamount], "memo": row[FIELD_MAP.memo]
+                                "user": userName, "destination": row[FIELD_MAP.destination], "dep": row['ClassHash'][FIELD_MAP.dep], "arr": row['ClassHash'][FIELD_MAP.arr],
+                                "way": row['ClassHash'][FIELD_MAP.way], "trip": row['ClassHash'][FIELD_MAP.trip], "amount": row['NumHash'][FIELD_MAP.totalamount], "memo": row[FIELD_MAP.memo]
                             });
                         });
+                        console.log("DEBUG: 送信データの内容 -> ", sendDataList);
                         //承認情報も入力
                         var sendApprovalList = {};
                         
@@ -1083,7 +1087,8 @@ $p.events.on_editor_load = function () {
                         if(/*$p.getControl(CLASS_REQUESTDATE).text() !== ''*/currentStatus !== STATUS_TEXT.creating && currentStatus !== STATUS_TEXT.reject){ //申請日項目だけプリザンター側で読み取り専用処理をしているためtextで取得
                             sendApprovalList.user = {
                                 "name": getUserName(CLASS_USER), // ★修正
-                                "date": $p.getControl(CLASS_REQUESTDATE).val()
+                                //"date": $p.getControl(CLASS_REQUESTDATE).val()
+                                "date": $p.getControl(CLASS_REQUESTDATE).text()
                             };
                         }
                         //上長(上長承認日入力済みか)
@@ -1145,29 +1150,6 @@ $p.events.on_editor_load = function () {
         //#endregion
 
     })();
-
-    //#region< 「決済(完了)」ボタンを押した時専用チェック>　※多分使えない。$p.events.before_send_Process_3の指示ができないと思う
-    // $p.events.before_send_Process_3 = function () {
-        
-    //     const gridWrap = document.querySelector('#Issues_Source' + childTableId + 'Wrap');
-    //     if (!gridWrap) return true; // テーブルが無ければ通過させる
-
-    //     // 1. 全チェックボックスの数を取得
-    //     const allCheckboxes = gridWrap.querySelectorAll('.accounting-checkbox');
-    //     // 2. チェックが入っている数を取得
-    //     const checkedBoxes = gridWrap.querySelectorAll('.accounting-checkbox:checked');
-
-    //     // 明細が1件以上あり、かつ数が一致していない場合
-    //     if (allCheckboxes.length > 0 && allCheckboxes.length !== checkedBoxes.length) {
-    //         alert('【エラー】\n経理チェックが完了していない明細があるため、決済に進めません。');
-    //         return false; // ★ここで処理をキャンセル（画面は遷移せず、元のまま）
-    //     }
-
-    //     return true; // 全てチェックされていれば、そのまま決済処理へ進む
-    // };
-    //#endregion
-
-
     //#endregion
 
     //#region<自動入力系>
@@ -1285,6 +1267,7 @@ $p.events.on_editor_load = function () {
 
 //#region <決済プロセス実行前のチェック用関数（スクリプトタブに記載）>
 $p.ex.validateKeiriCheck = function() {
+    console.log("DEBUG: validateKeiriCheck called");
     const gridWrap = document.querySelector('#Issues_Source' + CHILD_TABLE_ID + 'Wrap');
     
     if (!gridWrap) return true; // テーブルが無ければ通過させる
