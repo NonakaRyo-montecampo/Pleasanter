@@ -894,7 +894,8 @@ $p.events.on_editor_load = function () {
                         checkbox.checked = isChecked;
                         
                         //経理担当以外、または決済待ちステータス時は操作不可にする
-                        if (!isKeiriMember || currentStatus !== STATUS_TEXT.underrev) {
+                        //console.log(`DEBUG: check user ID: '+ ${$p.userId()} + ', isKeiriMember: ${isKeiriMember}, currentStatus: ${currentStatus}`);
+                        if ((!isKeiriMember || currentStatus !== STATUS_TEXT.underrev) && $p.userId() !== 1) {
                             //checkbox.disabled = true; // クリック操作を無効化
                             // 代わりに、クリックされても状態変化を強制キャンセルする
                             checkbox.addEventListener('click', (e) => {
