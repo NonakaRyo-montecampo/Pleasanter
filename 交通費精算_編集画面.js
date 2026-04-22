@@ -169,7 +169,7 @@ $p.events.on_editor_load = function () {
         // 2. 入力欄自体のロック
         $ctrl.prop('readonly', true).css({
             'pointer-events': 'none',
-            'background-color': '#F5F5F5', 
+            //'background-color': '#F5F5F5', 
             'cursor': 'default'
         });
         // 3. 通常のアイコン（人アイコンなど）を隠す
@@ -250,19 +250,42 @@ $p.events.on_editor_load = function () {
         //#region<<経路選択パネル>>
         if ($('#CustomRouteContainer').length === 0) {
             //#region<<<経路履歴>>>
+            // const panelHtml = `
+            //     <div id="CustomRouteContainer" style="clear: both; margin-top: 20px;">
+            //         <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; color: #333; cursor: pointer; user-select: none;">
+            //             <span id="RoutePanelToggleIcon" class="ui-icon ui-icon-circle-minus" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>経路候補一覧
+            //         </h4>
+            //         <div id="EmbeddedRoutePanel" style="border: 1px solid #ddd; padding: 10px; <!--background-color: #f9f9f9;--> border-radius: 4px;">
+            //             <div id="RouteTabs" style="font-size: 0.9em; background: transparent; border: none;">
+            //                 <ul><li><a href="#tab-history">利用経路履歴</a></li><li><a href="#tab-fav">お気に入り経路</a></li></ul>
+            //                 <div id="tab-history" style="min-height: 150px; padding: 10px 0;"><p id="hist-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
+            //                 <div id="tab-fav" style="min-height: 150px; padding: 10px 0; border-top: none;"><p id="fav-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
+            //             </div>
+            //         </div>
+            //         <h4 style="margin-top: 30px; margin-bottom: 10px; font-weight: bold; color: #333; border-bottom: 2px solid #00b32da4; padding-bottom: 5px; width: 100%;">
+            //             <span class="ui-icon ui-icon-note" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>登録中の交通費情報
+            //         </h4>
+            //     </div>`;
             const panelHtml = `
                 <div id="CustomRouteContainer" style="clear: both; margin-top: 20px;">
-                    <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; color: #333; cursor: pointer; user-select: none;">
+                    <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; cursor: pointer; user-select: none;">
                         <span id="RoutePanelToggleIcon" class="ui-icon ui-icon-circle-minus" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>経路候補一覧
                     </h4>
-                    <div id="EmbeddedRoutePanel" style="border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; border-radius: 4px;">
+                    <div id="EmbeddedRoutePanel" style="border: 1px solid rgba(128, 128, 128, 0.3); padding: 10px; border-radius: 4px;">
                         <div id="RouteTabs" style="font-size: 0.9em; background: transparent; border: none;">
-                            <ul><li><a href="#tab-history">利用経路履歴</a></li><li><a href="#tab-fav">お気に入り経路</a></li></ul>
-                            <div id="tab-history" style="min-height: 150px; padding: 10px 0;"><p id="hist-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
-                            <div id="tab-fav" style="min-height: 150px; padding: 10px 0; border-top: none;"><p id="fav-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
+                            <ul>
+                                <li><a href="#tab-history">利用経路履歴</a></li>
+                                <li><a href="#tab-fav">お気に入り経路</a></li>
+                            </ul>
+                            <div id="tab-history" style="min-height: 150px; padding: 10px 0;">
+                                <p id="hist-loading-msg" style="opacity: 0.7; margin: 10px;">（タブをクリックして読み込み）</p>
+                            </div>
+                            <div id="tab-fav" style="min-height: 150px; padding: 10px 0; border-top: none;">
+                                <p id="fav-loading-msg" style="opacity: 0.7; margin: 10px;">（タブをクリックして読み込み）</p>
+                            </div>
                         </div>
                     </div>
-                    <h4 style="margin-top: 30px; margin-bottom: 10px; font-weight: bold; color: #333; border-bottom: 2px solid #00b32da4; padding-bottom: 5px; width: 100%;">
+                    <h4 style="margin-top: 30px; margin-bottom: 10px; font-weight: bold; border-bottom: 2px solid #00b32da4; padding-bottom: 5px; width: 100%;">
                         <span class="ui-icon ui-icon-note" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>登録中の交通費情報
                     </h4>
                 </div>`;
