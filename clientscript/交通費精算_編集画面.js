@@ -4,16 +4,6 @@
 //===============================================================================================================================================
 //以下@siteid list start以下はサイトパッケージエクスポートにて自動変換されるため手での修正不要
 // @siteid list start@
-// 以下クラウド版用のID
-// const CHILD_TABLE_ID = 15339887;    //「交通費精算レコード」テーブルID
-// const FAV_TABLE_ID = 15951290;      //「お気に入り経路」テーブルID
-// const HIST_TABLE_ID = 15960204;     //「経路履歴」テーブルID
-
-// const KEIRI_GROUP_ID = 3305;    //「経理担当」グループID
-// const GAAPP_GROUP_ID = 3304;    //「総務承認者」グループID
-
-// const URL_PASS = '/fs';        //API用URL　パス部分の記載 http://{サーバー名}/{パス}/api/{コントローラー名}/{ID}/{メソッド名}
-
 //以下オンプレミス版のID
 const CHILD_TABLE_ID = 5;    //「交通費精算レコード」テーブルID
 const FAV_TABLE_ID = 7;      //「お気に入り経路」テーブルID
@@ -250,22 +240,6 @@ $p.events.on_editor_load = function () {
         //#region<<経路選択パネル>>
         if ($('#CustomRouteContainer').length === 0) {
             //#region<<<経路履歴>>>
-            // const panelHtml = `
-            //     <div id="CustomRouteContainer" style="clear: both; margin-top: 20px;">
-            //         <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; color: #333; cursor: pointer; user-select: none;">
-            //             <span id="RoutePanelToggleIcon" class="ui-icon ui-icon-circle-minus" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>経路候補一覧
-            //         </h4>
-            //         <div id="EmbeddedRoutePanel" style="border: 1px solid #ddd; padding: 10px; <!--background-color: #f9f9f9;--> border-radius: 4px;">
-            //             <div id="RouteTabs" style="font-size: 0.9em; background: transparent; border: none;">
-            //                 <ul><li><a href="#tab-history">利用経路履歴</a></li><li><a href="#tab-fav">お気に入り経路</a></li></ul>
-            //                 <div id="tab-history" style="min-height: 150px; padding: 10px 0;"><p id="hist-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
-            //                 <div id="tab-fav" style="min-height: 150px; padding: 10px 0; border-top: none;"><p id="fav-loading-msg" style="color:#666; margin:10px;">（タブをクリックして読み込み）</p></div>
-            //             </div>
-            //         </div>
-            //         <h4 style="margin-top: 30px; margin-bottom: 10px; font-weight: bold; color: #333; border-bottom: 2px solid #00b32da4; padding-bottom: 5px; width: 100%;">
-            //             <span class="ui-icon ui-icon-note" style="display:inline-block; vertical-align:middle; margin-right:5px;"></span>登録中の交通費情報
-            //         </h4>
-            //     </div>`;
             const panelHtml = `
                 <div id="CustomRouteContainer" style="clear: both; margin-top: 20px;">
                     <h4 id="RoutePanelHeader" style="margin-bottom: 5px; font-weight: bold; cursor: pointer; user-select: none;">
@@ -295,77 +269,15 @@ $p.events.on_editor_load = function () {
             if ($anchor.length === 0) $anchor = $targetBtn;
             $anchor.last().after(panelHtml);
 
-            // 履歴データ読込 (User IDを使用)
-            const loadHistoryData = async () => {
+            // 履歴データ読込 (サーバーレンダリング版)
+            const loadHistoryData = () => {
                 const $histContainer = $('#tab-history');
-                //const currentUserId = $p.userId();
-                const SESSION_KEY_HIST = 'TrafficApp_History';
-                let historyList = [];
-                const sessionData = sessionStorage.getItem(SESSION_KEY_HIST);
-                let needsApiFetch = true;
                 
-                if (sessionData) {
-                    const parsed = JSON.parse(sessionData);
-                    if (parsed.userId === currentUserId && parsed.data) {
-                        historyList = parsed.data;
-                        if(parsed.data.length > 0) needsApiFetch = false;
-                    }
-                }
-                
-                if (needsApiFetch) {
-                    $histContainer.html('<p style="padding:10px;">履歴を取得中...</p>');
-                    try {
-                        const result = await apiGetAsync({
-                            id: HIST_TABLE_ID,
-                            data: {
-                                View: {
-                                    ColumnFilterHash: { [HIST_USER_COL]: JSON.stringify([String(currentUserId)]) },
-                                    ColumnSorterHash: { CreatedTime: 'desc' }
-                                },
-                                PageSize: 10
-                            }
-                        });
-                        historyList = result.Response.Data || [];
-                        sessionStorage.setItem(SESSION_KEY_HIST, JSON.stringify({ userId: currentUserId, data: historyList }));
-                    } catch (e) {
-                        $histContainer.html('<p style="color:red; margin:10px;">履歴の読み込みに失敗しました。</p>');
-                        return;
-                    }
-                }
-                
-                $histContainer.empty();
-                if (historyList.length === 0) {
-                    $histContainer.html('<p style="color:#666; margin:10px;">履歴はありません。</p>');
+                // サーバー側で生成されたHTML（window.ServerHistHtml）があればそのまま表示
+                if (window.ServerHistHtml) {
+                    $histContainer.html(window.ServerHistHtml);
                 } else {
-                    let tableHtml = '<table class="grid" style="width:100%; font-size:12px; border-collapse: collapse;"><thead style="background:#eee;"><tr><th style="width:70px;"></th><th>日付</th><th>行先</th><th>経路</th><th>金額</th><th>備考</th></tr></thead><tbody>';
-                    const limit = 5;
-                    historyList.slice(0, limit).forEach(r => {
-                        const routeDesc = (r['ClassHash'][HIST_FIELD_MAP.dep] || '') + ' → ' + (r['ClassHash'][HIST_FIELD_MAP.arr] || '') + ' <span style="color:#666;">(' + (r['ClassHash'][HIST_FIELD_MAP.way] || '-') + ')</span>'; 
-                        const copyData = {
-                            [FIELD_MAP.destination]: r[HIST_FIELD_MAP.destination], 
-                            [FIELD_MAP.dep]: r['ClassHash'][HIST_FIELD_MAP.dep], 
-                            [FIELD_MAP.arr]: r['ClassHash'][HIST_FIELD_MAP.arr], 
-                            [FIELD_MAP.way]: r['ClassHash'][HIST_FIELD_MAP.way], 
-                            [FIELD_MAP.amount]: r['NumHash'][HIST_FIELD_MAP.amount], 
-                            _mode: 'copy'
-                        };
-                        const jsonStr = JSON.stringify(copyData).replace(/"/g, '&quot;');
-                        let dateStr = r['DateHash'][HIST_REGISTDATE] ? new Date(r['DateHash'][HIST_REGISTDATE]).toLocaleDateString() : '-';
-                        tableHtml += 
-                        `<tr style="border-bottom:1px solid #eee;">
-                            <td style="text-align:center; padding: 5px;">
-                                <button type="button" class="select-route-btn ui-button ui-corner-all ui-widget" style="padding:2px 8px; font-size:11px; white-space: nowrap;" 
-                                data-json="${jsonStr}">選択</button>
-                            </td>
-                            <td style="padding: 5px;">${dateStr}</td>
-                            <td style="padding: 5px;">${r[HIST_FIELD_MAP.destination]}</td>
-                            <td style="padding: 5px;">${routeDesc}</td>
-                            <td style="text-align:right; padding: 5px;">${(r['NumHash'][HIST_FIELD_MAP.amount] || 0).toLocaleString() + "円"}</td>
-                            <td style="padding: 5px;">${r[HIST_MEMO] || ''}</td>
-                        </tr>`;
-                    });
-                    tableHtml += '</tbody></table>';
-                    $histContainer.html(tableHtml);
+                    $histContainer.html('<p style="color:#666; margin:10px;">履歴はありません。</p>');
                 }
             };
             //#endregion
@@ -639,97 +551,12 @@ $p.events.on_editor_load = function () {
 
     //#region<メイン処理：アクセス制御とUI構築>
     //ユーザーの所属グループ取得
-    const checkUserGroupAsync = async (groupId, sessionkey) => {
-        const cachedSession = sessionStorage.getItem(sessionkey);
-        if(cachedSession !== null){
-            return (cachedSession === 'true');
-        }
-        else{
-            return new Promise((resolve) => {
-                $p.apiGroupsGet({
-                    data:{
-                        View: {
-                            ColumnFilterHash: {
-                                GroupId: '[' + groupId + ']'
-                            }
-                        }
-                    },
-                    done: function(res) {
-                        try{
-                            if (res.StatusCode === 200 && res.Response.Data.length > 0) {
-                                const members = res.Response.Data[0].GroupMembers || [];
-                                const consist_in_group = members.filter(member => member.split(',').includes(String($p.userId())));
-                                const returnbool = consist_in_group.length > 0;
-                                sessionStorage.setItem(sessionkey, returnbool);
-                                resolve(returnbool);
-                            } else {
-                                resolve(false);
-                            }
-                        }
-                        catch (e) {
-                            console.error("グループ情報の取得に失敗", e);
-                            resolve(false);
-                        }  
-                    },
-                    fail: function(err) {
-                        console.error("User API Error:", err);
-                        resolve(false);
-                    }
-                });
-            });
-        }
-        
-    };
-
+    const isKeiriMember = (typeof $p.groupIds === 'function') ? $p.groupIds().includes(KEIRI_GROUP_ID) : false;
+    console.log(`DEBUG: ユーザーのグループIDリスト`, $p.groupIds());
+    const isGAAppMember = (typeof $p.groupIds === 'function') ? $p.groupIds().includes(GAAPP_GROUP_ID) : false;
     (async () => {
         //#region<<権限確認>>
-        // ---------------------------------------------------------------
-        // 1. 情報取得（キャッシュ対応版）
-        // ---------------------------------------------------------------
-        //グループチェック
-        //const groupCheck = async(groupId)
-
-        // 経理担当グループ判定
-        const SESSION_KEY_IS_KEIRI = 'TrafficApp_IsKeiri_' + currentUserId;
-        let isKeiriMember = await checkUserGroupAsync(KEIRI_GROUP_ID, SESSION_KEY_IS_KEIRI);
-        //総務承認者グループ判定
-        const SESSION_KEY_IS_GAAPP = 'TrafficApp_IsGAApp_' + currentUserId;
-        let isGAAppMember = await checkUserGroupAsync(GAAPP_GROUP_ID, SESSION_KEY_IS_GAAPP);
-        // 部署取得アルゴリズム削除
-        /*
-        let myDept = '';
-
-        const SESSION_KEY_MY_DEPT = 'TrafficApp_MyDept_' + currentUserId;
-        const cachedDept = sessionStorage.getItem(SESSION_KEY_MY_DEPT);
-
-        if (cachedDept) {
-            myDept = cachedDept;
-            console.log("DEBUG: Load Dept from Cache: " + myDept);
-        } else {
-            try {
-                const result = await apiGetAsync({
-                    id: WORKERTABLE_ID,
-                    data: { 
-                        View: { 
-                            ColumnFilterHash: { [WORKERTABLE_CLASS_USER]: JSON.stringify([currentUserId]) } 
-                        } 
-                    }
-                });
-                if (result.Response.Data.length > 0) {
-                    myDept = result.Response.Data[0][WORKERTABLE_CLASS_DEPT];
-                    sessionStorage.setItem(SESSION_KEY_MY_DEPT, myDept);
-                    console.log("DEBUG: Fetch Dept from API & Saved: " + myDept);
-                }
-            } catch (e) {
-                console.error("部署情報の取得に失敗", e);
-            }
-        }
-        */
-
-        // ---------------------------------------------------------------
-        // 2. 権限判定
-        // ---------------------------------------------------------------
-
+        // 権限判定
         const applicantId = String($p.getControl(CLASS_USER).val() || ''); 
         const creatorId   = String($p.getControl(CLASS_CREATOR).val() || '');
         const superiorId  = String($p.getControl(CLASS_SUPERIOR).val() || '');
@@ -753,7 +580,7 @@ $p.events.on_editor_load = function () {
         // console.log(`Check -> isApp: ${isApplicant}, isSup: ${isSuperior}, isGA: ${isKeiriMember}`);
         // console.log(`=====================================`);
 
-        // 3. 権限付与ロジック
+        // 権限付与ロジック
         let allowEditFields = false; 
         let showProcessButtons = false; 
 
@@ -784,7 +611,7 @@ $p.events.on_editor_load = function () {
             showProcessButtons = true;
         }
 
-        console.log('allowEditField: ' + allowEditFields + ', showProcessButtons: ' + showProcessButtons);
+        // console.log('allowEditField: ' + allowEditFields + ', showProcessButtons: ' + showProcessButtons);
 
         //総務部編集可能であればsessionStorageにログインユーザーIDを保存
         if(GeneralAffairs_editable && isKeiriMember){
@@ -798,13 +625,13 @@ $p.events.on_editor_load = function () {
         //#region<<権限毎の画面制御>>
         //#region<<読み取り専用化処理>>
         //デフォルトで読み取り専用の項目を読み取り専用化    
-        setReadOnlyStyle(CLASS_SUPFIXDATE);
-        setReadOnlyStyle(CLASS_ACCFIXDATE);
-        setReadOnlyStyle(CLASS_GAFIXDATE);
-        setReadOnlyStyle(CLASS_ACCID);
-        setReadOnlyStyle(CLASS_GAID);
+        // setReadOnlyStyle(CLASS_SUPFIXDATE);
+        // setReadOnlyStyle(CLASS_ACCFIXDATE);
+        // setReadOnlyStyle(CLASS_GAFIXDATE);
+        // setReadOnlyStyle(CLASS_ACCID);
+        // setReadOnlyStyle(CLASS_GAID);
         //差し戻し時は申請日も読み取り専用化
-        if(currentStatus !== STATUS_TEXT.creating)setReadOnlyStyle(CLASS_REQUESTDATE);
+        // if(currentStatus !== STATUS_TEXT.creating)setReadOnlyStyle(CLASS_REQUESTDATE);
     
         // 4. 画面制御実行
         if (allowEditFields) {

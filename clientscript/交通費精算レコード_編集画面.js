@@ -454,7 +454,6 @@ $p.events.on_editor_load = function () {
 
     //領収書未登録時の保存拒否用関数
     const checkFileWarning = () => {
-
         const val = parseInt($p.getControl(CLASS_COST_ONEWAY).val()) || 0;
         
         // 金額が3万円以上の場合のみチェック
@@ -476,6 +475,7 @@ $p.events.on_editor_load = function () {
                 return false;
             }
         }
+        console.log("DEBUG: Checking file warning..."); // for debugging
         //条件未達成(保存制御に使用する用bool戻り値)
         return true; 
     };
