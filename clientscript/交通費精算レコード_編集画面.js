@@ -54,8 +54,6 @@ $p.events.on_editor_load = function () {
     const CLASS_DEP = 'ClassA'; //「出発駅」欄
     const CLASS_ARR = 'ClassB'; //「到着駅」欄
     const CLASS_TRAFFWAY = 'ClassD'; //「交通手段」欄
-    const CLASS_APPLICANT = 'ClassE'; //「利用者」欄
-    const CLASS_SUPERIOR = 'ClassC'; //「上長」欄    
     const CLASS_PARENTID = 'ClassI'; //「精算書名」欄
     const CLASS_RECORDNO = 'NumB'; //「精算書内データNo」欄
     const CLASS_ONEWAY = 'ClassH'; //「片道/往復」欄
@@ -88,7 +86,6 @@ $p.events.on_editor_load = function () {
         { child: 'NumC',         parent: null },     // 金額(片道)
         { child: 'Body',         parent: null },      // 備考
         { child: 'ClassE',       parent: 'ClassA' },  // 利用者（親からコピー）
-        { child: 'ClassC',       parent: 'ClassB' },  // 上長（親からコピー）
         { child: 'ClassI',       parent: 'Id' },       // 親レコードID
         { child: 'NumB',       parent: null }       // 請求書内No
     ];
@@ -125,8 +122,6 @@ $p.events.on_editor_load = function () {
     //-------------------------------------------------------------------------------------
 
     // 読み取り専用化
-    $p.getControl(CLASS_APPLICANT).prop('readonly', true).css({'pointer-events': 'none', 'background-color': '#eee'});
-    $p.getControl(CLASS_SUPERIOR).prop('readonly', true).css({'pointer-events': 'none', 'background-color': '#eee'});
     $p.getControl(CLASS_PARENTID).prop('readonly', true).css({'pointer-events': 'none', 'background-color': '#eee'});
     $p.getControl(CLASS_RECORDNO).prop('readonly', true).css({'pointer-events': 'none', 'background-color': '#eee'});
 
@@ -196,7 +191,8 @@ $p.events.on_editor_load = function () {
             }
             var control = $p.getControl(key);
             
-            if(control.length === 0) return;
+            //if(control.length === 0) return;
+            if(!control) return;
 
             var val = control.val();
 
@@ -250,7 +246,7 @@ $p.events.on_editor_load = function () {
             let colName = field.child;
             let control = $p.getControl(colName);
             
-            if(control.length === 0) return;
+            if(!control) return;
 
             let isRequired = control.attr('data-validate-required') || control.prop('required');
 
@@ -322,9 +318,9 @@ $p.events.on_editor_load = function () {
         // ※完全に一致するデータが既にあるか探す
         const duplicateIndex = historyList.findIndex(r => {
             return r.ClassA === newRecord.ClassA &&
-                   r.ClassB === newRecord.ClassB &&
-                   r.ClassC === newRecord.ClassC &&
-                   r.NumA   === newRecord.NumA;
+                    r.ClassB === newRecord.ClassB &&
+                    r.ClassC === newRecord.ClassC &&
+                    r.NumA   === newRecord.NumA;
         });
 
         // --- 4. 重複データの削除（サーバー & 配列） ---
@@ -475,7 +471,6 @@ $p.events.on_editor_load = function () {
                 return false;
             }
         }
-        console.log("DEBUG: Checking file warning..."); // for debugging
         //条件未達成(保存制御に使用する用bool戻り値)
         return true; 
     };
@@ -493,7 +488,6 @@ $p.events.on_editor_load = function () {
 
         // 既存の処理があれば先に実行（並び替え処理など）
         if (originalBeforeSend && originalBeforeSend(args) === false) {
-            console.log('another operation exists.');
             return false;
         }
 
@@ -525,7 +519,6 @@ $p.events.on_editor_load = function () {
 
             if (result.Response.Data.length > 0) {
                 const parentRecord = result.Response.Data[0];
-                //console.log("DEBUG: Parent record fetched successfully.", result); // for debugging
                 // API経由だとステータスは「ID(数値)」で返ってきます (例: 100)
                 const pStatusId = parentRecord.Status; 
 
@@ -540,7 +533,6 @@ $p.events.on_editor_load = function () {
 
                 }
                 else if (!ALLOWED_STATUS_IDS.includes(pStatusId) || String(parentRecord["ClassHash"][TRANSREPOTABLE_CLASS_CREATOR]) !== String($p.userId())) {
-                    console.log("Block Edit: Parent status ID is " + pStatusId);
                     
                     // アラート表示
                     alert(`親レコードのステータス(ID:${pStatusId})が編集可能な状態ではないため、\nこの明細の作成・編集・削除はできません。`);
@@ -569,7 +561,6 @@ $p.events.on_editor_load = function () {
     // =========================================================================
     // 1. 画面ロード時の処理（データの自動入力）
     // =========================================================================
-    //console.log('現在は: ' + $p.action());
     if ($p.action() === 'new' || $p.action() === 'New'){
         
         (async () => {
@@ -647,8 +638,6 @@ $p.events.on_editor_load = function () {
                 console.error('自動入力処理でエラー:', e);
             }
         })();
-        
-        console.log('DEBUG: CURRENT record No:' + $p.getControl(CLASS_RECORDNO).val());
     }
     //#endregion
 
@@ -739,8 +728,7 @@ $p.events.on_editor_load = function () {
                         } catch (e) {
                             console.error('Save Error:', e);
                             alert('保存に失敗しました。');
-                        }
-                                        
+                        }                                        
                     }
                 }
             }
@@ -881,8 +869,6 @@ $p.events.on_editor_load = function () {
         if(!checkFileWarning()){
             return;
         }
-
-        console.log("Start to save... Mode:" + mode);
         
         try {
             const safeParentId = getParentId();
