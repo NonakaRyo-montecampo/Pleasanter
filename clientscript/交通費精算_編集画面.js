@@ -59,13 +59,13 @@ $p.events.on_editor_load = function () {
 
     const currentStatus = $p.getControl('Status').text();
     const STATUS_TEXT = {
-       creating: '作成中',
-       approval: '承認待ち',
-       underrev: '決済待ち',
-       finalapp: '総務承認待ち',
-       underset: '精算待ち',
-       completed: '完了',
-       reject: '差し戻し'
+        creating: '作成中',
+        approval: '承認待ち',
+        underrev: '決済待ち',
+        finalapp: '総務承認待ち',
+        underset: '精算待ち',
+        completed: '完了',
+        reject: '差し戻し'
     }
 
     const TRAFREC_CLASS_DATANO = 'NumB';
@@ -113,19 +113,20 @@ $p.events.on_editor_load = function () {
 
     // =========================================================================
     // 指定項目読み取り専用化
-    const setReadOnlyStyle = (selector) => {
-        const $ctrl = $p.getControl(selector);
-        const $dateFieldWrapper = $ctrl.closest('date-field');
-        if ($dateFieldWrapper.length > 0) {
-            $dateFieldWrapper.before($ctrl);
-            $dateFieldWrapper.remove();
-        }
-        $ctrl.prop('readonly', true).css({
-            'pointer-events': 'none',
-            'cursor': 'default'
-        });
-        $ctrl.siblings('.ui-icon-person').hide();
-    };
+    // 2026/5/11 未使用に伴い削除予定
+    // const setReadOnlyStyle = (selector) => {
+    //     const $ctrl = $p.getControl(selector);
+    //     const $dateFieldWrapper = $ctrl.closest('date-field');
+    //     if ($dateFieldWrapper.length > 0) {
+    //         $dateFieldWrapper.before($ctrl);
+    //         $dateFieldWrapper.remove();
+    //     }
+    //     $ctrl.prop('readonly', true).css({
+    //         'pointer-events': 'none',
+    //         'cursor': 'default'
+    //     });
+    //     $ctrl.siblings('.ui-icon-person').hide();
+    // };
     //#endregion
 
     //#region<関数定義>
@@ -216,7 +217,7 @@ $p.events.on_editor_load = function () {
         });
     });
 
-     $(document).off('click', '.delete-fav-btn').on('click', '.delete-fav-btn', async function() {
+    $(document).off('click', '.delete-fav-btn').on('click', '.delete-fav-btn', async function() {
         if (!confirm("本当に削除しますか？")) return;
 
         const $row = $(this).closest('tr');
@@ -447,6 +448,7 @@ $p.events.on_editor_load = function () {
         //#endregion
 
         //#region<<権限毎の画面制御>>
+        // 権限ごとの交通費申請レコード作成ボタン制御
         if (allowEditFields) {
             var $targetBtn = $('button[data-to-site-id="' + CHILD_TABLE_ID + '"]');
             if ($targetBtn.length > 0) {
@@ -489,6 +491,7 @@ $p.events.on_editor_load = function () {
             });
         }
 
+        
         if (!showProcessButtons) {
             $('#MainCommands button').hide();
             $('#GoBack').show();
@@ -766,32 +769,33 @@ $p.events.on_editor_load = function () {
     //#endregion
 
     //#region<自動入力系>
-    if($p.getControl(CLASS_CREATOR).val() === ''){
-        $p.set($p.getControl(CLASS_CREATOR), $p.userId());
-    }
-    if(currentStatus === STATUS_TEXT.approval){
-        const today = new Date();
-        $p.set($p.getControl(CLASS_SUPFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
-    }
-    else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_SUPFIXDATE).val() !== ''){
-        $p.set($p.getControl(CLASS_SUPFIXDATE), '');
-    }
-    if(currentStatus === STATUS_TEXT.underrev){
-        const today = new Date();
-        $p.set($p.getControl(CLASS_ACCFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
-        $p.set($p.getControl(CLASS_ACCID), $p.userId());
-    }
-    else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_ACCFIXDATE).val() !== ''){
-        $p.set($p.getControl(CLASS_ACCFIXDATE), '');
-    }
-    if(currentStatus === STATUS_TEXT.finalapp){
-        const today = new Date();
-        $p.set($p.getControl(CLASS_GAFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
-        $p.set($p.getControl(CLASS_GAID), $p.userId());
-    }
-    else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_GAFIXDATE).val() !== ''){
-        $p.set($p.getControl(CLASS_GAFIXDATE), '');
-    }
+    // テーブル管理>プロセス>データ変更 による自動入力に切り替え
+    // if($p.getControl(CLASS_CREATOR).val() === ''){
+    //     $p.set($p.getControl(CLASS_CREATOR), $p.userId());
+    // }
+    // if(currentStatus === STATUS_TEXT.approval){
+    //     const today = new Date();
+    //     $p.set($p.getControl(CLASS_SUPFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
+    // }
+    // else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_SUPFIXDATE).val() !== ''){
+    //     $p.set($p.getControl(CLASS_SUPFIXDATE), '');
+    // }
+    // if(currentStatus === STATUS_TEXT.underrev){
+    //     const today = new Date();
+    //     $p.set($p.getControl(CLASS_ACCFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
+    //     $p.set($p.getControl(CLASS_ACCID), $p.userId());
+    // }
+    // else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_ACCFIXDATE).val() !== ''){
+    //     $p.set($p.getControl(CLASS_ACCFIXDATE), '');
+    // }
+    // if(currentStatus === STATUS_TEXT.finalapp){
+    //     const today = new Date();
+    //     $p.set($p.getControl(CLASS_GAFIXDATE), today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate());
+    //     $p.set($p.getControl(CLASS_GAID), $p.userId());
+    // }
+    // else if(currentStatus == STATUS_TEXT.reject && $p.getControl(CLASS_GAFIXDATE).val() !== ''){
+    //     $p.set($p.getControl(CLASS_GAFIXDATE), '');
+    // }
     //#endregion
 
     //#region <子レコード並び替え & 一括更新機能>
